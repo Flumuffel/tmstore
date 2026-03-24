@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Klixa TM Store Loader
 // @namespace    klixa.tm.store
-// @version      0.2.6
+// @version      0.2.7
 // @description  Loads approved Intranet apps from GitHub Raw manifest
 // @match        https://intranet.klixa.ch/*
 // @updateURL    https://raw.githubusercontent.com/Flumuffel/tmstore/refs/heads/main/tools/tampermonkey/loader.user.js
@@ -47,7 +47,7 @@
   var UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
   var DEFAULT_SETTINGS = {
     enabledApps: {
-      darkmode: true
+      
     },
     ui: {
       open: false
