@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Klixa TM Store Loader
 // @namespace    klixa.tm.store
-// @version      0.4.15
+// @version      0.4.16
 // @author LWE
 // @description  Loads approved Intranet apps from GitHub Raw manifest
 // @match        https://intranet.klixa.ch/*
@@ -860,6 +860,12 @@
       if (storeGrid) storeGrid.classList.toggle("tm-store-hidden", hideMain);
       if (storeMeta) storeMeta.classList.toggle("tm-store-hidden", hideMain);
       if (updateBannerWrap) updateBannerWrap.classList.toggle("tm-store-hidden", hideMain);
+    }
+    if (fab) {
+      fab.onclick = function () {
+        if (overlay) overlay.style.display = "flex";
+        setPageView("main");
+      };
     }
     function openSettingsView() {
       if (overlay) overlay.style.display = "flex";
