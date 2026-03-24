@@ -2,6 +2,7 @@
 // @name         Klixa TM Store Loader
 // @namespace    klixa.tm.store
 // @version      0.4.6
+// @author LWE
 // @description  Loads approved Intranet apps from GitHub Raw manifest
 // @match        https://intranet.klixa.ch/*
 // @updateURL    https://raw.githubusercontent.com/Flumuffel/tmstore/refs/heads/main/tools/tampermonkey/loader.user.js
