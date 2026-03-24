@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Klixa TM Store Loader
 // @namespace    klixa.tm.store
-// @version      0.3.0
+// @version      0.4.0
 // @description  Loads approved Intranet apps from GitHub Raw manifest
 // @match        https://intranet.klixa.ch/*
 // @updateURL    https://raw.githubusercontent.com/Flumuffel/tmstore/refs/heads/main/tools/tampermonkey/loader.user.js
@@ -51,7 +51,11 @@
     },
     ui: {
       open: false
-    }
+    },
+    update: {
+      intervalMs: UPDATE_CHECK_INTERVAL_MS
+    },
+    appSettings: {}
   };
   var RUNTIME = {
     apps: [],
@@ -225,11 +229,29 @@
 
   function loadSettings() {
     var raw = GM_getValue(SETTINGS_KEY, "");
-    if (!raw) {
-      GM_setValue(SETTINGS_KEY, JSON.stringify(DEFAULT_SETTINGS));
-      return DEFAULT_SETTINGS;
+    var parsed = !raw ? DEFAULT_SETTINGS : safeParse(raw, DEFAULT_SETTINGS);
+    parsed.enabledApps = parsed.enabledApps || {};
+    parsed.ui = parsed.ui || { open: false };
+    parsed.update = parsed.update || {};
+    if (!parsed.update.intervalMs || Number(parsed.update.intervalMs) < 60 * 1000) {
+      parsed.update.intervalMs = UPDATE_CHECK_INTERVAL_MS;
     }
-    return safeParse(raw, DEFAULT_SETTINGS);
+    parsed.appSettings = parsed.appSettings || {};
+    GM_setValue(SETTINGS_KEY, JSON.stringify(parsed));
+    return parsed;
+  }
+
+  function getUpdateIntervalMs(settings) {
+    var val = settings && settings.update ? Number(settings.update.intervalMs) : 0;
+    if (!val || val < 60 * 1000) return UPDATE_CHECK_INTERVAL_MS;
+    return val;
+  }
+
+  function getAppSettings(settings, appId) {
+    var map = settings && settings.appSettings ? settings.appSettings : {};
+    var value = map[appId];
+    if (value && typeof value === "object") return value;
+    return {};
   }
 
   function loadUpdateState() {
@@ -350,7 +372,11 @@
       appVersion: app.version,
       settingsKey: SETTINGS_KEY,
       repository: REPO_URL,
-      cssInjectedByLoader: !!RUNTIME.loadedCss[app.id]
+      cssInjectedByLoader: !!RUNTIME.loadedCss[app.id],
+      appSettings: getAppSettings(loadSettings(), app.id)
+    };
+    window.__TM_STORE_GET_APP_SETTINGS = function (id) {
+      return getAppSettings(loadSettings(), id || app.id);
     };
     var wrapped = "(function(window, document){\n" + code + "\n})(window, document);";
     try {
@@ -474,6 +500,7 @@
       ".tm-store-close{background:#263d63;color:#e8eefc;border:1px solid #7293cd;border-radius:10px;padding:8px 12px;cursor:pointer}" +
       ".tm-store-debug-btn{background:#1f4a38;color:#d7ffe5;border:1px solid #45a67a;border-radius:10px;padding:8px 12px;cursor:pointer}" +
       ".tm-store-update-btn{background:#5b3f13;color:#ffe8c8;border:1px solid #d59a42;border-radius:10px;padding:8px 12px;cursor:pointer}" +
+      ".tm-store-settings-btn{background:#2a3550;color:#e6efff;border:1px solid #7e93bf;border-radius:10px;padding:8px 12px;cursor:pointer}" +
       ".tm-store-link{color:#9dc2ff;text-decoration:none}" +
       ".tm-store-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}" +
       ".tm-store-update-banner{margin:12px 0;padding:10px 12px;border:1px solid #8b6a35;border-radius:12px;background:linear-gradient(135deg,rgba(96,60,15,.45),rgba(58,43,24,.35));color:#ffe9cf}" +
@@ -488,7 +515,15 @@
       "@keyframes tmToastIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}" +
       ".tm-store-debug{margin-top:12px;border:1px solid #4f6591;border-radius:12px;padding:10px;background:rgba(8,14,29,.65)}" +
       ".tm-store-debug-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}" +
-      ".tm-store-debug-pre{font-family:Consolas,monospace;font-size:12px;white-space:pre-wrap;line-height:1.35;max-height:240px;overflow:auto;color:#cfe1ff;background:#0b1220;border:1px solid #334a73;border-radius:8px;padding:8px}"
+      ".tm-store-debug-pre{font-family:Consolas,monospace;font-size:12px;white-space:pre-wrap;line-height:1.35;max-height:240px;overflow:auto;color:#cfe1ff;background:#0b1220;border:1px solid #334a73;border-radius:8px;padding:8px}" +
+      ".tm-store-settings{margin-top:12px;border:1px solid #4f6591;border-radius:12px;padding:12px;background:rgba(8,14,29,.72)}" +
+      ".tm-store-settings h4{margin:0 0 8px 0}" +
+      ".tm-store-settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}" +
+      ".tm-store-field{display:flex;flex-direction:column;gap:6px}" +
+      ".tm-store-field label{font-size:12px;color:#bdd1f5}" +
+      ".tm-store-field select,.tm-store-field textarea,.tm-store-field input{background:#0d1629;color:#e8f1ff;border:1px solid #4f6591;border-radius:8px;padding:8px;font-size:12px}" +
+      ".tm-store-app-settings{margin-top:10px;display:grid;gap:10px}" +
+      ".tm-store-app-setting-item{border:1px solid #425a85;border-radius:10px;padding:10px;background:rgba(15,23,42,.5)}"
     ;
     root.appendChild(style);
   }
@@ -554,9 +589,7 @@
         (RUNTIME.loaderUpdate.commitTitle ? "<br><strong>Letzter Commit:</strong> " + RUNTIME.loaderUpdate.commitTitle : "") +
         (RUNTIME.loaderUpdate.commitSha ? " <span style='opacity:.8'>(#" + RUNTIME.loaderUpdate.commitSha + ")</span>" : "") +
         (RUNTIME.loaderUpdate.commitUrl ? "<br><a class='tm-store-link' target='_blank' href='" + RUNTIME.loaderUpdate.commitUrl + "'>Commit auf GitHub ansehen</a>" : "") +
-        "<div class='tm-store-update-actions'>" +
-          "<button class='tm-store-confirm-btn' id='tm-store-update-confirm-btn' type='button'>Gelesen</button>" +
-        "</div>" +
+        "<br>Update-Flow findest du unter <strong>Einstellungen</strong>." +
         "</div>";
     }
 
@@ -564,13 +597,12 @@
       "<div class='tm-store-panel'>" +
         "<div class='tm-store-top'>" +
           "<div class='tm-store-title'>" +
-            "<h3 style='margin:0'>Tampermonkey Store</h3>" +
+            "<h3 style='margin:0'>Klixa Extension Store</h3>" +
             "<p class='tm-store-subtitle'>Apps, Updates und Debugging zentral in einem Store.</p>" +
             "<span class='tm-store-version-pill'>Store-Version: v" + LOADER_LOCAL_VERSION + "</span>" +
           "</div>" +
           "<div class='tm-store-actions'>" +
-            "<button class='tm-store-update-btn' id='tm-store-update-check-btn' type='button'>Update prüfen</button> " +
-            (RUNTIME.loaderUpdate.hasUpdate ? "<button class='tm-store-update-btn' id='tm-store-update-now-btn' type='button'>Jetzt aktualisieren</button> " : "") +
+            "<button class='tm-store-settings-btn' id='tm-store-settings-btn' type='button'>Einstellungen</button> " +
             "<button class='tm-store-debug-btn' id='tm-store-debug-btn' type='button'>Debug</button> " +
             "<button class='tm-store-close' id='tm-store-close' type='button'>Schließen</button>" +
           "</div>" +
@@ -581,6 +613,32 @@
         "</div>" +
         updateBanner +
         "<div class='tm-store-grid'>" + cards + "</div>" +
+        "<div class='tm-store-settings' id='tm-store-settings' style='display:none'>" +
+          "<h4>Einstellungen</h4>" +
+          "<div class='tm-store-settings-grid'>" +
+            "<div class='tm-store-field'>" +
+              "<label>Update-Intervall</label>" +
+              "<select id='tm-store-update-interval'>" +
+                "<option value='300000'>5 Minuten</option>" +
+                "<option value='900000'>15 Minuten</option>" +
+                "<option value='1800000'>30 Minuten</option>" +
+                "<option value='3600000'>1 Stunde</option>" +
+                "<option value='21600000'>6 Stunden</option>" +
+                "<option value='43200000'>12 Stunden</option>" +
+              "</select>" +
+            "</div>" +
+            "<div class='tm-store-field'>" +
+              "<label>Loader-Update</label>" +
+              "<div>" +
+                "<button class='tm-store-update-btn' id='tm-store-update-check-btn' type='button'>Jetzt prüfen</button> " +
+                (RUNTIME.loaderUpdate.hasUpdate ? "<button class='tm-store-update-btn' id='tm-store-update-now-btn' type='button'>Aktualisieren</button> " : "") +
+                "<button class='tm-store-confirm-btn' id='tm-store-update-confirm-btn' type='button'>Update bestätigen</button>" +
+              "</div>" +
+            "</div>" +
+          "</div>" +
+          "<div class='tm-store-app-settings' id='tm-store-app-settings'></div>" +
+          "<div style='margin-top:10px'><button class='tm-store-confirm-btn' id='tm-store-save-settings-btn' type='button'>Einstellungen speichern</button></div>" +
+        "</div>" +
         "<div class='tm-store-debug' id='tm-store-debug' style='display:none'>" +
           "<div class='tm-store-debug-head'><strong>Debug-Logs</strong><button class='tm-store-close' id='tm-store-debug-refresh' type='button'>Aktualisieren</button></div>" +
           "<div class='tm-store-debug-pre' id='tm-store-debug-pre'></div>" +
@@ -593,9 +651,14 @@
     });
 
     var debugBtn = root.getElementById("tm-store-debug-btn");
+    var settingsBtn = root.getElementById("tm-store-settings-btn");
     var updateCheckBtn = root.getElementById("tm-store-update-check-btn");
     var updateNowBtn = root.getElementById("tm-store-update-now-btn");
     var updateConfirmBtn = root.getElementById("tm-store-update-confirm-btn");
+    var saveSettingsBtn = root.getElementById("tm-store-save-settings-btn");
+    var updateInterval = root.getElementById("tm-store-update-interval");
+    var settingsWrap = root.getElementById("tm-store-settings");
+    var appSettingsWrap = root.getElementById("tm-store-app-settings");
     var debugWrap = root.getElementById("tm-store-debug");
     var debugRefresh = root.getElementById("tm-store-debug-refresh");
     function renderDebugLogs() {
@@ -621,7 +684,16 @@
     debugBtn.addEventListener("click", function () {
       var open = debugWrap.style.display !== "none";
       debugWrap.style.display = open ? "none" : "block";
+      settingsWrap.style.display = "none";
       if (!open) renderDebugLogs();
+    });
+    settingsBtn.addEventListener("click", function () {
+      var open = settingsWrap.style.display !== "none";
+      settingsWrap.style.display = open ? "none" : "block";
+      debugWrap.style.display = "none";
+      if (!open && updateInterval) {
+        updateInterval.value = String(getUpdateIntervalMs(settings));
+      }
     });
     debugRefresh.addEventListener("click", renderDebugLogs);
     updateCheckBtn.addEventListener("click", function () {
@@ -641,6 +713,40 @@
         renderStoreOverlay(RUNTIME.apps, loadSettings());
       });
     }
+    if (appSettingsWrap) {
+      appSettingsWrap.innerHTML = published.map(function (app) {
+        var value = JSON.stringify(getAppSettings(settings, app.id), null, 2);
+        return (
+          "<div class='tm-store-app-setting-item'>" +
+            "<strong>" + app.name + "</strong>" +
+            "<div class='tm-store-field'>" +
+              "<label>App-Einstellungen (JSON) für " + app.id + "</label>" +
+              "<textarea id='tm-app-settings-" + app.id + "' rows='4'>" + value + "</textarea>" +
+            "</div>" +
+          "</div>"
+        );
+      }).join("");
+    }
+    if (saveSettingsBtn) {
+      saveSettingsBtn.addEventListener("click", function () {
+        var next = loadSettings();
+        next.update = next.update || {};
+        next.update.intervalMs = parseInt((updateInterval && updateInterval.value) || "", 10) || UPDATE_CHECK_INTERVAL_MS;
+        next.appSettings = next.appSettings || {};
+        for (var idx = 0; idx < published.length; idx += 1) {
+          var app = published[idx];
+          var area = root.getElementById("tm-app-settings-" + app.id);
+          if (!area) continue;
+          var parsedValue = safeParse(area.value || "{}", {});
+          if (parsedValue && typeof parsedValue === "object") {
+            next.appSettings[app.id] = parsedValue;
+          }
+        }
+        saveSettings(next);
+        addLog("info", "settings", "Einstellungen gespeichert", { intervalMs: next.update.intervalMs });
+        renderStoreOverlay(RUNTIME.apps, next);
+      });
+    }
 
     var toggles = overlay.querySelectorAll("[data-app-toggle]");
     for (var j = 0; j < toggles.length; j += 1) {
@@ -652,8 +758,10 @@
   }
 
   async function checkLoaderUpdate(force) {
+    var settings = loadSettings();
     var state = loadUpdateState();
-    if (!force && state.checkedAt && (now() - state.checkedAt) < UPDATE_CHECK_INTERVAL_MS) {
+    var intervalMs = getUpdateIntervalMs(settings);
+    if (!force && state.checkedAt && (now() - state.checkedAt) < intervalMs) {
       RUNTIME.loaderUpdate = state;
       addLog("info", "update", "Update-Check übersprungen (Intervall aktiv)");
       return state;
@@ -690,6 +798,15 @@
         commitUrl: commit.url,
         commitSha: commit.sha
       };
+      var previous = loadUpdateState();
+      if (previous && previous.hasUpdate && !state.hasUpdate && isVersionNewer(previous.remoteVersion, LOADER_LOCAL_VERSION)) {
+        state.hasUpdate = true;
+        state.remoteVersion = previous.remoteVersion;
+        state.commitTitle = previous.commitTitle;
+        state.commitUrl = previous.commitUrl;
+        state.commitSha = previous.commitSha;
+        addLog("info", "update", "Update-Hinweis bleibt aktiv bis lokale Version nachgezogen hat");
+      }
       saveUpdateState(state);
       RUNTIME.loaderUpdate = state;
       addLog("info", "update", "Update-Check abgeschlossen", state);
