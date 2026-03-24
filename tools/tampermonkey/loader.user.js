@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Klixa TM Store Loader
 // @namespace    klixa.tm.store
-// @version      0.4.13
+// @version      0.4.14
 // @author LWE
 // @description  Loads approved Intranet apps from GitHub Raw manifest
 // @match        https://intranet.klixa.ch/*
@@ -758,13 +758,13 @@
           "<div class='tm-store-update-hub'>" +
             "<div class='tm-store-update-hub-head'>" +
               "<div class='tm-store-update-hub-title'>Loader Update-Zentrale</div>" +
-              "<span class='tm-store-update-chip " + updateChipClass + "'>" + updateChipText + "</span>" +
+              "<span id='tm-update-chip' class='tm-store-update-chip " + updateChipClass + "'>" + updateChipText + "</span>" +
             "</div>" +
             "<div class='tm-store-update-hub-grid'>" +
               "<div class='tm-store-update-kv'><strong>Lokal:</strong> v" + escapeHtml(LOADER_LOCAL_VERSION) + "</div>" +
-              "<div class='tm-store-update-kv'><strong>Remote:</strong> v" + escapeHtml(RUNTIME.loaderUpdate.remoteVersion || "-") + "</div>" +
-              "<div class='tm-store-update-kv'><strong>Letzte Prüfung:</strong> " + escapeHtml(checkedAtText) + "</div>" +
-              "<div class='tm-store-update-kv'><strong>Nächste Prüfung:</strong> " + escapeHtml(nextCheckText) + "</div>" +
+              "<div class='tm-store-update-kv'><strong>Remote:</strong> <span id='tm-update-remote'>v" + escapeHtml(RUNTIME.loaderUpdate.remoteVersion || "-") + "</span></div>" +
+              "<div class='tm-store-update-kv'><strong>Letzte Prüfung:</strong> <span id='tm-update-last-check'>" + escapeHtml(checkedAtText) + "</span></div>" +
+              "<div class='tm-store-update-kv'><strong>Nächste Prüfung:</strong> <span id='tm-update-next-check'>" + escapeHtml(nextCheckText) + "</span></div>" +
             "</div>" +
             ((RUNTIME.loaderUpdate.commitTitle || RUNTIME.loaderUpdate.commitUrl)
               ? (
@@ -861,6 +861,13 @@
       if (storeMeta) storeMeta.classList.toggle("tm-store-hidden", hideMain);
       if (updateBannerWrap) updateBannerWrap.classList.toggle("tm-store-hidden", hideMain);
     }
+    function openSettingsView() {
+      if (overlay) overlay.style.display = "flex";
+      setPageView("settings");
+      if (updateInterval) {
+        updateInterval.value = String(getUpdateIntervalMs(settings));
+      }
+    }
     function renderDebugLogs() {
       var target = root.getElementById("tm-store-debug-pre");
       if (!target) return;
@@ -921,6 +928,7 @@
           return;
         }
         saveUpdateAck(RUNTIME.loaderUpdate.remoteVersion || "");
+        dismissToastByKey("update-unread");
         showToast("Bestätigt", "Update wurde als gelesen markiert.");
         renderStoreOverlay(RUNTIME.apps, loadSettings());
       });
@@ -1001,6 +1009,25 @@
         showToast("Author gesendet", "Befehl a " + author + " wurde gesendet.");
       });
     }
+    var hasUnreadUpdate = RUNTIME.loaderUpdate.hasUpdate && loadUpdateAck() !== String(RUNTIME.loaderUpdate.remoteVersion || "");
+    if (hasUnreadUpdate) {
+      showToast(
+        "Update verfügbar",
+        "Neues Loader-Update erkannt. Öffne die Einstellungen, um zu installieren oder als gelesen zu markieren.",
+        {
+          variant: "warn",
+          duration: 0,
+          replaceKey: "update-unread",
+          actionLabel: "Zu Einstellungen",
+          onAction: function () {
+            openSettingsView();
+          }
+        }
+      );
+    } else {
+      dismissToastByKey("update-unread");
+    }
+    syncUpdateHubInDom(settings);
   }
 
   async function checkLoaderUpdate(force) {
@@ -1080,6 +1107,7 @@
         ]).then(function () {
           if (document.body) {
             renderStoreOverlay(RUNTIME.apps, loadSettings());
+            syncUpdateHubInDom(loadSettings());
           }
         }).finally(function () {
           scheduleNextTick();
@@ -1090,6 +1118,23 @@
       intervalMs: getUpdateIntervalMs(loadSettings())
     });
     scheduleNextTick();
+  }
+
+  function syncUpdateHubInDom(settings) {
+    var root = ensureStoreRoot();
+    var statusChip = root.getElementById("tm-update-chip");
+    var remote = root.getElementById("tm-update-remote");
+    var checked = root.getElementById("tm-update-last-check");
+    var next = root.getElementById("tm-update-next-check");
+    if (!statusChip || !remote || !checked || !next) return;
+    var updateAcked = loadUpdateAck() === String(RUNTIME.loaderUpdate.remoteVersion || "");
+    var updateHas = !!RUNTIME.loaderUpdate.hasUpdate;
+    statusChip.className = "tm-store-update-chip " + (updateHas ? (updateAcked ? "neutral" : "warn") : "ok");
+    statusChip.textContent = updateHas ? (updateAcked ? "Update bestätigt" : "Update verfügbar") : "Aktuell";
+    remote.textContent = "v" + (RUNTIME.loaderUpdate.remoteVersion || "-");
+    checked.textContent = formatDateTimeBerlin(RUNTIME.loaderUpdate.checkedAt);
+    var nextCheckTs = RUNTIME.loaderUpdate.checkedAt ? (Number(RUNTIME.loaderUpdate.checkedAt) + Number(getUpdateIntervalMs(settings))) : 0;
+    next.textContent = nextCheckTs ? formatDateTimeBerlin(nextCheckTs) : "sofort";
   }
 
   function renderBootFeedback() {}
@@ -1104,6 +1149,14 @@
       root.appendChild(host);
     }
     return host;
+  }
+
+  function dismissToastByKey(key) {
+    if (!key) return;
+    var toaster = ensureToaster();
+    var selector = "[data-toast-key='" + String(key).replace(/'/g, "\\'") + "']";
+    var existing = toaster.querySelector(selector);
+    if (existing) existing.remove();
   }
 
   function showToast(title, message, options) {
