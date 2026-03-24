@@ -25,6 +25,13 @@
   var RAW_BASE = "https://raw.githubusercontent.com/" + GITHUB_OWNER + "/" + GITHUB_REPO + "/refs/heads/" + GITHUB_REF;
   var MANIFEST_URL = RAW_BASE + "/api/tm-store/apps.json";
   var LOADER_REMOTE_URL = RAW_BASE + "/tools/tampermonkey/loader.user.js";
+  var LOADER_CONTENT_API_URL =
+    "https://api.github.com/repos/" +
+    GITHUB_OWNER +
+    "/" +
+    GITHUB_REPO +
+    "/contents/tools/tampermonkey/loader.user.js?ref=" +
+    encodeURIComponent(GITHUB_REF);
   var REPO_URL = "https://github.com/" + GITHUB_OWNER + "/" + GITHUB_REPO;
   var CACHE_KEY = "tm_store_cache_v1_" + GITHUB_OWNER + "_" + GITHUB_REPO + "_" + GITHUB_REF;
   var SETTINGS_KEY = "tm_store_settings_v1";
@@ -124,6 +131,19 @@
     if (!source) return null;
     var match = source.match(/@version\s+([0-9]+(?:\.[0-9]+)*)/);
     return match ? match[1] : null;
+  }
+
+  function decodeBase64Utf8(input) {
+    try {
+      var cleaned = String(input || "").replace(/\s/g, "");
+      return decodeURIComponent(escape(atob(cleaned)));
+    } catch (err) {
+      try {
+        return atob(String(input || "").replace(/\s/g, ""));
+      } catch (err2) {
+        return "";
+      }
+    }
   }
 
   function equalsIgnoreCase(a, b) {
@@ -616,9 +636,18 @@
     }
 
     try {
-      var updateUrl = LOADER_REMOTE_URL + "?t=" + now();
-      addLog("info", "update", "Prüfe Loader-Update", { url: updateUrl });
-      var remoteSource = await gmRequestText(updateUrl);
+      addLog("info", "update", "Prüfe Loader-Update (GitHub API)", { url: LOADER_CONTENT_API_URL });
+      var apiTxt = await gmRequest(LOADER_CONTENT_API_URL + "&t=" + now());
+      var apiObj = safeParse(apiTxt, null);
+      var remoteSource = "";
+      if (apiObj && apiObj.content) {
+        remoteSource = decodeBase64Utf8(apiObj.content);
+      }
+      if (!remoteSource) {
+        var updateUrl = LOADER_REMOTE_URL + "?t=" + now() + "&r=" + Math.random().toString(36).slice(2);
+        addLog("info", "update", "Fallback auf raw.githubusercontent.com", { url: updateUrl });
+        remoteSource = await gmRequestText(updateUrl);
+      }
       var remoteVersion = extractUserscriptVersion(remoteSource);
       var hasUpdate = !!(remoteVersion && isVersionNewer(remoteVersion, LOADER_LOCAL_VERSION));
       var commit = { title: null, url: null, sha: null };
