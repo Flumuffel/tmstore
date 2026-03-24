@@ -1,0 +1,39 @@
+:root {
+  --bg: #0f1115;
+  --panel: #171a21;
+  --text: #edf1fb;
+  --muted: #9fa9be;
+  --border: #2b3242;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Segoe UI, Arial, sans-serif;
+  background: linear-gradient(180deg, #0e1017 0%, #111623 100%);
+  color: var(--text);
+}
+
+.app-shell {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.panel p {
+  color: var(--muted);
+}
+
+.tm-store-link {
+  color: #9dc2ff;
+}

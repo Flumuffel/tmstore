@@ -1,0 +1,57 @@
+:root.tm-darkmode {
+  --tm-bg: #0f1218;
+  --tm-panel: #171d29;
+  --tm-card: #1f2633;
+  --tm-border: #2b3448;
+  --tm-text: #e8edf8;
+  --tm-muted: #aab4c8;
+  --tm-link: #82b2ff;
+}
+
+html.tm-darkmode,
+body.tm-darkmode {
+  background: var(--tm-bg) !important;
+  color: var(--tm-text) !important;
+}
+
+.tm-darkmode #centermid,
+.tm-darkmode #main,
+.tm-darkmode #tpl,
+.tm-darkmode .maincontent,
+.tm-darkmode .gadget,
+.tm-darkmode .container,
+.tm-darkmode fieldset,
+.tm-darkmode .menu,
+.tm-darkmode table,
+.tm-darkmode td,
+.tm-darkmode th {
+  background-color: var(--tm-panel) !important;
+  color: var(--tm-text) !important;
+  border-color: var(--tm-border) !important;
+}
+
+.tm-darkmode .odd {
+  background-color: #172030 !important;
+}
+
+.tm-darkmode .even {
+  background-color: #1d2739 !important;
+}
+
+.tm-darkmode a,
+.tm-darkmode a:visited {
+  color: var(--tm-link) !important;
+}
+
+.tm-darkmode input,
+.tm-darkmode select,
+.tm-darkmode textarea {
+  background: var(--tm-card) !important;
+  color: var(--tm-text) !important;
+  border: 1px solid var(--tm-border) !important;
+}
+
+/* Keep warning colors intact where semantic colors matter. */
+.tm-darkmode td[style*="background-color: red"] {
+  filter: brightness(0.9) contrast(1.1);
+}
