@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Klixa TM Store Loader
 // @namespace    klixa.tm.store
-// @version      0.4.22
+// @version      0.4.23
 // @author LWE
 // @description  Loads approved Intranet apps from GitHub Raw manifest
 // @match        https://intranet.klixa.ch/*
@@ -1134,9 +1134,18 @@
     }
     if (searchInput) {
       searchInput.addEventListener("input", function () {
+        var caretPos = searchInput.selectionStart;
         RUNTIME.storeUi.searchQuery = String(searchInput.value || "");
         RUNTIME.storeUi.page = 1;
         renderStoreOverlay(RUNTIME.apps, loadSettings());
+        var nextInput = ensureStoreRoot().getElementById("tm-store-search-input");
+        if (nextInput) {
+          nextInput.focus();
+          var pos = typeof caretPos === "number" ? caretPos : nextInput.value.length;
+          try {
+            nextInput.setSelectionRange(pos, pos);
+          } catch (err) {}
+        }
       });
     }
     function resetSearchFilter() {
