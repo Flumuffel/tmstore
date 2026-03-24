@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Klixa TM Store Loader
 // @namespace    klixa.tm.store
-// @version      0.4.4
+// @version      0.4.5
 // @description  Loads approved Intranet apps from GitHub Raw manifest
 // @match        https://intranet.klixa.ch/*
 // @updateURL    https://raw.githubusercontent.com/Flumuffel/tmstore/refs/heads/main/tools/tampermonkey/loader.user.js
@@ -60,6 +60,7 @@
   };
   var RUNTIME = {
     apps: [],
+    registryUpdatedAt: null,
     loaded: {},
     status: [],
     logs: [],
@@ -620,6 +621,7 @@
             "<h3 style='margin:0'>Klixa Extension Store</h3>" +
             "<p class='tm-store-subtitle'>Apps, Updates und Debugging zentral in einem Store.</p>" +
             "<span class='tm-store-version-pill'>Store-Version: v" + LOADER_LOCAL_VERSION + "</span>" +
+            "<span class='tm-store-version-pill'>App-List: " + escapeHtml(RUNTIME.registryUpdatedAt || "-") + "</span>" +
           "</div>" +
           "<div class='tm-store-actions'>" +
             "<button class='tm-store-settings-btn' id='tm-store-settings-btn' type='button'>Einstellungen</button> " +
@@ -1032,6 +1034,7 @@
 
     var apps = payload.apps || [];
     RUNTIME.apps = apps;
+    RUNTIME.registryUpdatedAt = payload.updatedAt || null;
     if (document.body) {
       renderStoreOverlay(apps, settings);
       renderBootFeedback();

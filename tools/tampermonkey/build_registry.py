@@ -4,6 +4,7 @@ import datetime
 import json
 import re
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 
 HEADER_PATTERN = re.compile(
@@ -129,7 +130,7 @@ def main() -> None:
         apps.append(build_app_entry(meta, rel_js_path, raw_base))
 
     payload = {
-        "updatedAt": datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+        "updatedAt": datetime.datetime.now(ZoneInfo("Europe/Berlin")).replace(microsecond=0).isoformat(),
         "source": {
             "type": "github",
             "repository": f"https://github.com/{args.repo_owner}/{args.repo_name}",
