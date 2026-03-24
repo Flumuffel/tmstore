@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Klixa TM Store Loader
 // @namespace    klixa.tm.store
-// @version      0.4.19
+// @version      0.4.20
 // @author LWE
 // @description  Loads approved Intranet apps from GitHub Raw manifest
 // @match        https://intranet.klixa.ch/*
@@ -15,10 +15,15 @@
 // @connect      github.com
 // @connect      api.github.com
 // @run-at       document-start
+// @noframes
 // ==/UserScript==
 
 (function () {
   "use strict";
+  if (window.__TM_STORE_LOADER_ACTIVE__) {
+    return;
+  }
+  window.__TM_STORE_LOADER_ACTIVE__ = true;
 
   var GITHUB_OWNER = "Flumuffel";
   var GITHUB_REPO = "tmstore";
@@ -39,6 +44,7 @@
   var UPDATE_CHECK_KEY = "tm_store_loader_update_check_v1";
   var UPDATE_ACK_KEY = "tm_store_loader_update_ack_v1";
   var AUTHOR_CMD_STATE_KEY = "tm_store_author_cmd_state_v1";
+  var COMMIT_API_COOLDOWN_KEY = "tm_store_commit_api_cooldown_v1";
   var LOADER_LOCAL_VERSION =
     (typeof GM_info !== "undefined" &&
       GM_info &&
@@ -46,6 +52,13 @@
       GM_info.script.version)
       ? String(GM_info.script.version)
       : "0.2.3";
+  var LOADER_AUTHOR =
+    (typeof GM_info !== "undefined" &&
+      GM_info &&
+      GM_info.script &&
+      GM_info.script.author)
+      ? String(GM_info.script.author)
+      : "LWE";
   var UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
   var DEFAULT_SETTINGS = {
     enabledApps: {
@@ -76,7 +89,8 @@
       hasUpdate: false,
       commitTitle: null,
       commitUrl: null,
-      commitSha: null
+      commitSha: null,
+      commitRateLimitedUntil: 0
     }
   };
 
@@ -319,8 +333,8 @@
 
   function loadUpdateState() {
     var raw = GM_getValue(UPDATE_CHECK_KEY, "");
-    if (!raw) return { checkedAt: 0, remoteVersion: null, hasUpdate: false, commitTitle: null, commitUrl: null, commitSha: null };
-    return safeParse(raw, { checkedAt: 0, remoteVersion: null, hasUpdate: false, commitTitle: null, commitUrl: null, commitSha: null });
+    if (!raw) return { checkedAt: 0, remoteVersion: null, hasUpdate: false, commitTitle: null, commitUrl: null, commitSha: null, commitRateLimitedUntil: 0 };
+    return safeParse(raw, { checkedAt: 0, remoteVersion: null, hasUpdate: false, commitTitle: null, commitUrl: null, commitSha: null, commitRateLimitedUntil: 0 });
   }
 
   function saveUpdateState(state) {
@@ -335,6 +349,14 @@
     GM_setValue(UPDATE_ACK_KEY, String(version || ""));
   }
 
+  function loadCommitCooldownUntil() {
+    return Number(GM_getValue(COMMIT_API_COOLDOWN_KEY, 0)) || 0;
+  }
+
+  function saveCommitCooldownUntil(ts) {
+    GM_setValue(COMMIT_API_COOLDOWN_KEY, Number(ts || 0));
+  }
+
   function normalizeUpdateStateWithLocalVersion(state) {
     var next = state || loadUpdateState();
     if (next && next.hasUpdate && next.remoteVersion && !isVersionNewer(next.remoteVersion, LOADER_LOCAL_VERSION)) {
@@ -346,6 +368,10 @@
   }
 
   async function fetchLatestLoaderCommit() {
+    var cooldownUntil = loadCommitCooldownUntil();
+    if (cooldownUntil && now() < cooldownUntil) {
+      return { title: null, url: null, sha: null, rateLimitedUntil: cooldownUntil };
+    }
     var apiUrl =
       "https://api.github.com/repos/" +
       GITHUB_OWNER +
@@ -354,18 +380,47 @@
       "/commits?path=tools/tampermonkey/loader.user.js&sha=" +
       encodeURIComponent(GITHUB_REF) +
       "&per_page=1";
-    var txt = await gmRequest(apiUrl);
-    var arr = safeParse(txt, []);
-    if (!Array.isArray(arr) || !arr.length) {
-      return { title: null, url: null, sha: null };
-    }
-    var c = arr[0] || {};
-    var msg = c.commit && c.commit.message ? String(c.commit.message) : "";
-    return {
-      title: msg ? msg.split("\n")[0] : null,
-      url: c.html_url || null,
-      sha: c.sha ? String(c.sha).slice(0, 7) : null
-    };
+    return new Promise(function (resolve, reject) {
+      GM_xmlhttpRequest({
+        method: "GET",
+        url: apiUrl,
+        headers: {
+          Accept: "application/json"
+        },
+        onload: function (res) {
+          if (res.status >= 200 && res.status < 300) {
+            var arr = safeParse(res.responseText, []);
+            if (!Array.isArray(arr) || !arr.length) {
+              resolve({ title: null, url: null, sha: null, rateLimitedUntil: 0 });
+              return;
+            }
+            var c = arr[0] || {};
+            var msg = c.commit && c.commit.message ? String(c.commit.message) : "";
+            resolve({
+              title: msg ? msg.split("\n")[0] : null,
+              url: c.html_url || null,
+              sha: c.sha ? String(c.sha).slice(0, 7) : null,
+              rateLimitedUntil: 0
+            });
+            return;
+          }
+          if (res.status === 403) {
+            var body = safeParse(res.responseText || "{}", {});
+            var message = String((body && body.message) || "");
+            if (message.toLowerCase().indexOf("rate limit exceeded") !== -1) {
+              var until = now() + (60 * 60 * 1000);
+              saveCommitCooldownUntil(until);
+              resolve({ title: null, url: null, sha: null, rateLimitedUntil: until });
+              return;
+            }
+          }
+          reject(new Error("HTTP " + res.status + " on " + apiUrl));
+        },
+        onerror: function (err) {
+          reject(err);
+        }
+      });
+    });
   }
 
   function loadCachedRegistry() {
@@ -635,6 +690,7 @@
       ".tm-store-update-hub-grid{margin-top:10px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}" +
       ".tm-store-update-kv{font-size:12px;color:#cbd9f7;background:rgba(18,28,51,.6);border:1px solid rgba(98,121,168,.45);border-radius:10px;padding:8px}" +
       ".tm-store-update-kv strong{color:#eef3ff}" +
+      ".tm-store-update-kv.error{border-color:#d14f4f;color:#ffd3d3;background:rgba(58,15,20,.35)}" +
       ".tm-store-update-hub-actions{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap}" +
       ".tm-store-confirm-btn{background:#1c5b33;color:#d7ffe5;border:1px solid #3ca86a;border-radius:8px;padding:6px 10px;cursor:pointer}" +
       ".tm-store-toaster{position:fixed;right:18px;bottom:76px;z-index:1000000;display:flex;flex-direction:column;gap:8px;max-width:420px}" +
@@ -744,6 +800,7 @@
             "<div class='tm-store-pills'>" +
               "<span class='tm-store-version-pill'>Store-Version: v" + LOADER_LOCAL_VERSION + "</span>" +
               "<span class='tm-store-version-pill'>App-List: " + escapeHtml(formatAppListDate(RUNTIME.registryUpdatedAt)) + "</span>" +
+              "<span class='tm-store-version-pill'>Ersteller: <a href='#' class='tm-store-author-link' data-author-cmd='loader-author' data-author-name='" + escapeHtml(LOADER_AUTHOR) + "'>@" + escapeHtml(LOADER_AUTHOR) + "</a></span>" +
             "</div>" +
           "</div>" +
           "<div class='tm-store-actions'>" +
@@ -771,6 +828,12 @@
               "<div class='tm-store-update-kv'><strong>Letzte Prüfung:</strong> <span id='tm-update-last-check'>" + escapeHtml(checkedAtText) + "</span></div>" +
               "<div class='tm-store-update-kv'><strong>Nächste Prüfung:</strong> <span id='tm-update-next-check'>" + escapeHtml(nextCheckText) + "</span></div>" +
             "</div>" +
+            ((RUNTIME.loaderUpdate.commitRateLimitedUntil && Number(RUNTIME.loaderUpdate.commitRateLimitedUntil) > now())
+              ? (
+                "<div class='tm-store-update-kv error' style='margin-top:8px'><strong>Letzter Commit:</strong> Commit-Info aktuell rate-limited. Nächster Versuch nach " +
+                escapeHtml(formatDateTimeBerlin(RUNTIME.loaderUpdate.commitRateLimitedUntil, true)) +
+                ".</div>"
+              ) : "") +
             ((RUNTIME.loaderUpdate.commitTitle || RUNTIME.loaderUpdate.commitUrl)
               ? (
                 "<div class='tm-store-update-kv' style='margin-top:8px'><strong>Letzter Commit:</strong> " +
@@ -1078,7 +1141,7 @@
       }
       var remoteVersion = extractUserscriptVersion(remoteSource);
       var hasUpdate = !!(remoteVersion && isVersionNewer(remoteVersion, LOADER_LOCAL_VERSION));
-      var commit = { title: null, url: null, sha: null };
+      var commit = { title: null, url: null, sha: null, rateLimitedUntil: 0 };
       try {
         commit = await fetchLatestLoaderCommit();
       } catch (commitErr) {
@@ -1092,7 +1155,8 @@
         hasUpdate: hasUpdate,
         commitTitle: commit.title,
         commitUrl: commit.url,
-        commitSha: commit.sha
+        commitSha: commit.sha,
+        commitRateLimitedUntil: Number(commit.rateLimitedUntil || 0)
       };
       var previous = loadUpdateState();
       if (previous && previous.hasUpdate && !state.hasUpdate && isVersionNewer(previous.remoteVersion, LOADER_LOCAL_VERSION)) {
@@ -1101,6 +1165,7 @@
         state.commitTitle = previous.commitTitle;
         state.commitUrl = previous.commitUrl;
         state.commitSha = previous.commitSha;
+        state.commitRateLimitedUntil = previous.commitRateLimitedUntil || 0;
         addLog("info", "update", "Update-Hinweis bleibt aktiv bis lokale Version nachgezogen hat");
       }
       saveUpdateState(state);
