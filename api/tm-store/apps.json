@@ -17,8 +17,8 @@
       "approvedBy": "admin",
       "submittedAt": "2026-03-24T08:00:00Z",
       "publishedAt": "2026-03-24T08:25:00Z",
-      "bundleUrl": "https://raw.githubusercontent.com/Flumuffel/tmstore/main/tools/tampermonkey/apps/darkmode.app.js",
-      "cssUrl": "https://raw.githubusercontent.com/Flumuffel/tmstore/main/tools/tampermonkey/apps/darkmode.css",
+      "bundleUrl": "https://raw.githubusercontent.com/Flumuffel/tmstore/refs/heads/main/tools/tampermonkey/apps/darkmode.app.js",
+      "cssUrl": "https://raw.githubusercontent.com/Flumuffel/tmstore/refs/heads/main/tools/tampermonkey/apps/darkmode.css",
       "match": "^https:\\/\\/intranet\\.klixa\\.ch\\/.*$",
       "sha256": "",
       "changelog": [
