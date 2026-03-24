@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Klixa TM Store Loader
 // @namespace    klixa.tm.store
-// @version      0.2.7
+// @version      0.3.0
 // @description  Loads approved Intranet apps from GitHub Raw manifest
 // @match        https://intranet.klixa.ch/*
 // @updateURL    https://raw.githubusercontent.com/Flumuffel/tmstore/refs/heads/main/tools/tampermonkey/loader.user.js
@@ -68,6 +68,19 @@
       commitSha: null
     }
   };
+
+  function ensureStoreRoot() {
+    var host = document.getElementById("tm-store-root-host");
+    if (!host) {
+      host = document.createElement("div");
+      host.id = "tm-store-root-host";
+      document.body.appendChild(host);
+    }
+    if (!host.shadowRoot) {
+      host.attachShadow({ mode: "open" });
+    }
+    return host.shadowRoot;
+  }
 
   function addLog(level, scope, message, data) {
     var entry = {
@@ -425,8 +438,11 @@
   }
 
   function ensureStoreStyles() {
-    if (document.getElementById("tm-store-style")) return;
-    GM_addStyle(
+    var root = ensureStoreRoot();
+    if (root.getElementById("tm-store-style")) return;
+    var style = document.createElement("style");
+    style.id = "tm-store-style";
+    style.textContent =
       ".tm-store-fab{position:fixed;right:18px;bottom:18px;z-index:999999;background:linear-gradient(135deg,#6d7dff,#39b7ff);color:#061326;border:none;border-radius:999px;padding:12px 16px;cursor:pointer;font-weight:800;box-shadow:0 12px 28px rgba(0,0,0,.35)}" +
       ".tm-store-fab.has-update{box-shadow:0 0 0 2px rgba(255,95,95,.35),0 12px 28px rgba(0,0,0,.35)}" +
       ".tm-store-fab-badge{position:absolute;top:-6px;right:-4px;width:12px;height:12px;border-radius:50%;background:#ff3a3a;border:2px solid #fff;display:none}" +
@@ -473,15 +489,14 @@
       ".tm-store-debug{margin-top:12px;border:1px solid #4f6591;border-radius:12px;padding:10px;background:rgba(8,14,29,.65)}" +
       ".tm-store-debug-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}" +
       ".tm-store-debug-pre{font-family:Consolas,monospace;font-size:12px;white-space:pre-wrap;line-height:1.35;max-height:240px;overflow:auto;color:#cfe1ff;background:#0b1220;border:1px solid #334a73;border-radius:8px;padding:8px}"
-    );
-    var styleMarker = document.createElement("meta");
-    styleMarker.id = "tm-store-style";
-    document.head.appendChild(styleMarker);
+    ;
+    root.appendChild(style);
   }
 
   function renderStoreOverlay(apps, settings) {
     ensureStoreStyles();
-    var fab = document.getElementById("tm-store-fab");
+    var root = ensureStoreRoot();
+    var fab = root.getElementById("tm-store-fab");
     if (!fab) {
       fab = document.createElement("button");
       fab.id = "tm-store-fab";
@@ -494,13 +509,13 @@
       fab.style.position = "fixed";
       fab.appendChild(badge);
       fab.addEventListener("click", function () {
-        var overlay = document.getElementById("tm-store-overlay");
+        var overlay = root.getElementById("tm-store-overlay");
         if (!overlay) return;
         overlay.style.display = "flex";
       });
-      document.body.appendChild(fab);
+      root.appendChild(fab);
     }
-    var fabBadge = document.getElementById("tm-store-fab-badge");
+    var fabBadge = root.getElementById("tm-store-fab-badge");
     if (RUNTIME.loaderUpdate.hasUpdate && loadUpdateAck() !== String(RUNTIME.loaderUpdate.remoteVersion || "")) {
       fab.classList.add("has-update");
       if (fabBadge) fabBadge.classList.add("show");
@@ -509,7 +524,7 @@
       if (fabBadge) fabBadge.classList.remove("show");
     }
 
-    var overlay = document.getElementById("tm-store-overlay");
+    var overlay = root.getElementById("tm-store-overlay");
     if (!overlay) {
       overlay = document.createElement("div");
       overlay.id = "tm-store-overlay";
@@ -519,7 +534,7 @@
           overlay.style.display = "none";
         }
       });
-      document.body.appendChild(overlay);
+      root.appendChild(overlay);
     }
 
     var published = apps.filter(isApprovedAndPublished);
@@ -572,19 +587,19 @@
         "</div>" +
       "</div>";
 
-    var close = document.getElementById("tm-store-close");
+    var close = root.getElementById("tm-store-close");
     close.addEventListener("click", function () {
       overlay.style.display = "none";
     });
 
-    var debugBtn = document.getElementById("tm-store-debug-btn");
-    var updateCheckBtn = document.getElementById("tm-store-update-check-btn");
-    var updateNowBtn = document.getElementById("tm-store-update-now-btn");
-    var updateConfirmBtn = document.getElementById("tm-store-update-confirm-btn");
-    var debugWrap = document.getElementById("tm-store-debug");
-    var debugRefresh = document.getElementById("tm-store-debug-refresh");
+    var debugBtn = root.getElementById("tm-store-debug-btn");
+    var updateCheckBtn = root.getElementById("tm-store-update-check-btn");
+    var updateNowBtn = root.getElementById("tm-store-update-now-btn");
+    var updateConfirmBtn = root.getElementById("tm-store-update-confirm-btn");
+    var debugWrap = root.getElementById("tm-store-debug");
+    var debugRefresh = root.getElementById("tm-store-debug-refresh");
     function renderDebugLogs() {
-      var target = document.getElementById("tm-store-debug-pre");
+      var target = root.getElementById("tm-store-debug-pre");
       if (!target) return;
       var enabledMap = settings.enabledApps || {};
       var header =
@@ -688,12 +703,13 @@
   }
 
   function renderBootFeedback() {
-    var host = document.getElementById("tm-store-feedback");
+    var root = ensureStoreRoot();
+    var host = root.getElementById("tm-store-feedback");
     if (!host) {
       host = document.createElement("div");
       host.id = "tm-store-feedback";
       host.className = "tm-store-feedback";
-      document.body.appendChild(host);
+      root.appendChild(host);
     }
     var statuses = RUNTIME.status.slice(-8);
     var okCount = 0;
@@ -712,7 +728,7 @@
       "<h4>Systemstatus • Geladen: " + okCount + " • Fehler: " + failCount + "</h4>" +
       "<ul>" + list + "</ul>";
     window.setTimeout(function () {
-      var current = document.getElementById("tm-store-feedback");
+      var current = root.getElementById("tm-store-feedback");
       if (current) current.remove();
     }, 4200);
   }
