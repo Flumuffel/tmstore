@@ -1,3 +1,16 @@
+/* ==TMStoreApp==
+@id darkmode
+@name Darkmode
+@version 0.2.5
+@description Dunkles Theme für das Intranet
+@status published
+@approved true
+@match ^https:\/\/intranet\.klixa\.ch\/.*$
+@css darkmode.css
+@changelog Darkmode wird ohne Buttons automatisch aktiviert
+@changelog Futuristisches UI-Feedback eingebaut
+==/TMStoreApp== */
+
 (function () {
   "use strict";
 
