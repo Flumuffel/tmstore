@@ -663,7 +663,7 @@
       root.appendChild(fab);
     }
     var fabBadge = root.getElementById("tm-store-fab-badge");
-    if (RUNTIME.loaderUpdate.hasUpdate) {
+    if (RUNTIME.loaderUpdate.hasUpdate && loadUpdateAck() !== String(RUNTIME.loaderUpdate.remoteVersion || "")) {
       fab.classList.add("has-update");
       if (fabBadge) fabBadge.classList.add("show");
     } else {
