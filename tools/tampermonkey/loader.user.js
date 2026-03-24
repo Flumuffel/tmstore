@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Klixa TM Store Loader
 // @namespace    klixa.tm.store
-// @version      0.2.2
+// @version      0.2.3
 // @description  Loads approved Intranet apps from GitHub Raw manifest
 // @match        https://intranet.klixa.ch/*
 // @updateURL    https://raw.githubusercontent.com/Flumuffel/tmstore/refs/heads/main/tools/tampermonkey/loader.user.js
@@ -23,9 +23,13 @@
   var GITHUB_REF = "main";
   var RAW_BASE = "https://raw.githubusercontent.com/" + GITHUB_OWNER + "/" + GITHUB_REPO + "/refs/heads/" + GITHUB_REF;
   var MANIFEST_URL = RAW_BASE + "/api/tm-store/apps.json";
+  var LOADER_REMOTE_URL = RAW_BASE + "/tools/tampermonkey/loader.user.js";
   var REPO_URL = "https://github.com/" + GITHUB_OWNER + "/" + GITHUB_REPO;
   var CACHE_KEY = "tm_store_cache_v1_" + GITHUB_OWNER + "_" + GITHUB_REPO + "_" + GITHUB_REF;
   var SETTINGS_KEY = "tm_store_settings_v1";
+  var UPDATE_CHECK_KEY = "tm_store_loader_update_check_v1";
+  var LOADER_LOCAL_VERSION = "0.2.3";
+  var UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
   var DEFAULT_SETTINGS = {
     enabledApps: {
       darkmode: true
@@ -39,7 +43,12 @@
     loaded: {},
     status: [],
     logs: [],
-    loadedCss: {}
+    loadedCss: {},
+    loaderUpdate: {
+      checkedAt: 0,
+      remoteVersion: null,
+      hasUpdate: false
+    }
   };
 
   function addLog(level, scope, message, data) {
@@ -78,6 +87,32 @@
     } catch (err) {
       return fallback;
     }
+  }
+
+  function parseVersionParts(v) {
+    return String(v || "0").split(".").map(function (x) {
+      var n = parseInt(x, 10);
+      return isNaN(n) ? 0 : n;
+    });
+  }
+
+  function isVersionNewer(remote, local) {
+    var a = parseVersionParts(remote);
+    var b = parseVersionParts(local);
+    var len = Math.max(a.length, b.length);
+    for (var i = 0; i < len; i += 1) {
+      var av = a[i] || 0;
+      var bv = b[i] || 0;
+      if (av > bv) return true;
+      if (av < bv) return false;
+    }
+    return false;
+  }
+
+  function extractUserscriptVersion(source) {
+    if (!source) return null;
+    var match = source.match(/@version\s+([0-9]+(?:\.[0-9]+)*)/);
+    return match ? match[1] : null;
   }
 
   function equalsIgnoreCase(a, b) {
@@ -151,6 +186,16 @@
       return DEFAULT_SETTINGS;
     }
     return safeParse(raw, DEFAULT_SETTINGS);
+  }
+
+  function loadUpdateState() {
+    var raw = GM_getValue(UPDATE_CHECK_KEY, "");
+    if (!raw) return { checkedAt: 0, remoteVersion: null, hasUpdate: false };
+    return safeParse(raw, { checkedAt: 0, remoteVersion: null, hasUpdate: false });
+  }
+
+  function saveUpdateState(state) {
+    GM_setValue(UPDATE_CHECK_KEY, JSON.stringify(state));
   }
 
   function loadCachedRegistry() {
@@ -340,7 +385,9 @@
       ".tm-store-btn.is-on{background:#7f1d1d;border-color:#ef4444}" +
       ".tm-store-close{background:#243653;color:#e8eefc;border:1px solid #5f7baa;border-radius:10px;padding:8px 12px;cursor:pointer}" +
       ".tm-store-debug-btn{background:#1e3a2e;color:#d7ffe5;border:1px solid #3f8b67;border-radius:10px;padding:8px 12px;cursor:pointer}" +
+      ".tm-store-update-btn{background:#493011;color:#ffe8c8;border:1px solid #c88a3a;border-radius:10px;padding:8px 12px;cursor:pointer}" +
       ".tm-store-link{color:#9dc2ff;text-decoration:none}" +
+      ".tm-store-update-banner{margin:10px 0;padding:10px 12px;border:1px solid #8b6a35;border-radius:10px;background:rgba(96,60,15,.35);color:#ffe9cf}" +
       ".tm-store-feedback{position:fixed;left:50%;top:18px;transform:translateX(-50%);z-index:999999;background:#101a2e;border:1px solid #4c628f;border-radius:12px;color:#e9f0ff;min-width:360px;max-width:92vw;padding:10px 12px;box-shadow:0 14px 30px rgba(0,0,0,.4)}" +
       ".tm-store-feedback h4{margin:0 0 8px 0;font-size:14px}" +
       ".tm-store-feedback ul{margin:0;padding-left:18px}" +
@@ -394,16 +441,28 @@
       cards += appCardHtml(app, enabled);
     }
 
+    var updateBanner = "";
+    if (RUNTIME.loaderUpdate.hasUpdate) {
+      updateBanner =
+        "<div class='tm-store-update-banner'>" +
+        "Neues Loader-Update verfügbar: v" + RUNTIME.loaderUpdate.remoteVersion +
+        " (lokal v" + LOADER_LOCAL_VERSION + ")." +
+        "</div>";
+    }
+
     overlay.innerHTML =
       "<div class='tm-store-panel'>" +
         "<div class='tm-store-top'>" +
           "<h3>Tampermonkey Store</h3>" +
           "<div>" +
+            "<button class='tm-store-update-btn' id='tm-store-update-check-btn' type='button'>Update prüfen</button> " +
+            (RUNTIME.loaderUpdate.hasUpdate ? "<button class='tm-store-update-btn' id='tm-store-update-now-btn' type='button'>Jetzt aktualisieren</button> " : "") +
             "<button class='tm-store-debug-btn' id='tm-store-debug-btn' type='button'>Debug</button> " +
             "<button class='tm-store-close' id='tm-store-close' type='button'>Schließen</button>" +
           "</div>" +
         "</div>" +
         "<p>Quelle: <a class='tm-store-link' target='_blank' href='" + REPO_URL + "'>" + REPO_URL + "</a></p>" +
+        updateBanner +
         "<p>Governance: Apps werden über Pull Requests + Reviews in GitHub freigegeben.</p>" +
         "<div class='tm-store-grid'>" + cards + "</div>" +
         "<div class='tm-store-debug' id='tm-store-debug' style='display:none'>" +
@@ -418,6 +477,8 @@
     });
 
     var debugBtn = document.getElementById("tm-store-debug-btn");
+    var updateCheckBtn = document.getElementById("tm-store-update-check-btn");
+    var updateNowBtn = document.getElementById("tm-store-update-now-btn");
     var debugWrap = document.getElementById("tm-store-debug");
     var debugRefresh = document.getElementById("tm-store-debug-refresh");
     function renderDebugLogs() {
@@ -430,6 +491,9 @@
         "Darkmode aktiviert: " + (!!enabledMap.darkmode) + "\n" +
         "Apps im Manifest: " + (apps.length) + "\n" +
         "Status-Einträge: " + (RUNTIME.status.length) + "\n" +
+        "Loader lokal: v" + LOADER_LOCAL_VERSION + "\n" +
+        "Loader remote: v" + (RUNTIME.loaderUpdate.remoteVersion || "-") + "\n" +
+        "Update verfügbar: " + (!!RUNTIME.loaderUpdate.hasUpdate) + "\n" +
         "Logs: " + (RUNTIME.logs.length) + "\n\n";
       var lines = RUNTIME.logs.slice(-120).map(function (l) {
         var data = l.data ? " | " + JSON.stringify(l.data) : "";
@@ -443,6 +507,17 @@
       if (!open) renderDebugLogs();
     });
     debugRefresh.addEventListener("click", renderDebugLogs);
+    updateCheckBtn.addEventListener("click", function () {
+      checkLoaderUpdate(true).then(function () {
+        renderStoreOverlay(RUNTIME.apps, loadSettings());
+      });
+    });
+    if (updateNowBtn) {
+      updateNowBtn.addEventListener("click", function () {
+        var url = LOADER_REMOTE_URL + "?t=" + now();
+        window.open(url, "_blank");
+      });
+    }
 
     var toggles = overlay.querySelectorAll("[data-app-toggle]");
     for (var j = 0; j < toggles.length; j += 1) {
@@ -450,6 +525,36 @@
         var appId = evt.target.getAttribute("data-app-toggle");
         toggleApp(appId);
       });
+    }
+  }
+
+  async function checkLoaderUpdate(force) {
+    var state = loadUpdateState();
+    if (!force && state.checkedAt && (now() - state.checkedAt) < UPDATE_CHECK_INTERVAL_MS) {
+      RUNTIME.loaderUpdate = state;
+      addLog("info", "update", "Update-Check übersprungen (Intervall aktiv)");
+      return state;
+    }
+
+    try {
+      addLog("info", "update", "Prüfe Loader-Update", { url: LOADER_REMOTE_URL });
+      var remoteSource = await gmRequestText(LOADER_REMOTE_URL);
+      var remoteVersion = extractUserscriptVersion(remoteSource);
+      var hasUpdate = !!(remoteVersion && isVersionNewer(remoteVersion, LOADER_LOCAL_VERSION));
+      state = {
+        checkedAt: now(),
+        remoteVersion: remoteVersion || null,
+        hasUpdate: hasUpdate
+      };
+      saveUpdateState(state);
+      RUNTIME.loaderUpdate = state;
+      addLog("info", "update", "Update-Check abgeschlossen", state);
+      return state;
+    } catch (err) {
+      addLog("error", "update", "Update-Check fehlgeschlagen", {
+        error: err && err.message ? err.message : "Unbekannt"
+      });
+      return state;
     }
   }
 
@@ -484,6 +589,13 @@
   }
 
   async function boot() {
+    RUNTIME.loaderUpdate = loadUpdateState();
+    checkLoaderUpdate(false).then(function () {
+      if (document.body) {
+        renderStoreOverlay(RUNTIME.apps, loadSettings());
+      }
+    });
+
     var settings = loadSettings();
     var payload;
 
