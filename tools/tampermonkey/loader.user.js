@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Klixa TM Store Loader
 // @namespace    klixa.tm.store
-// @version      0.4.14
+// @version      0.4.15
 // @author LWE
 // @description  Loads approved Intranet apps from GitHub Raw manifest
 // @match        https://intranet.klixa.ch/*
@@ -777,7 +777,7 @@
             "<div class='tm-store-update-hub-actions'>" +
               "<button class='tm-store-update-btn' id='tm-store-update-check-btn' type='button'>Jetzt prüfen</button> " +
               (RUNTIME.loaderUpdate.hasUpdate ? "<button class='tm-store-update-btn' id='tm-store-update-now-btn' type='button'>Update installieren</button> " : "") +
-              "<button class='tm-store-confirm-btn' id='tm-store-update-confirm-btn' type='button'>Als gelesen markieren</button>" +
+              (updateHas && !updateAcked ? "<button class='tm-store-confirm-btn' id='tm-store-update-confirm-btn' type='button'>Als gelesen markieren</button>" : "") +
             "</div>" +
           "</div>" +
           "<div class='tm-store-settings-grid'>" +
