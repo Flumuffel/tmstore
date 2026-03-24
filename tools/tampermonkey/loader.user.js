@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Klixa TM Store Loader
 // @namespace    klixa.tm.store
-// @version      0.2.5
+// @version      0.2.6
 // @description  Loads approved Intranet apps from GitHub Raw manifest
 // @match        https://intranet.klixa.ch/*
 // @updateURL    https://raw.githubusercontent.com/Flumuffel/tmstore/refs/heads/main/tools/tampermonkey/loader.user.js
@@ -414,7 +414,7 @@
           "<span>v" + app.version + "</span>" +
         "</div>" +
         "<p>" + app.description + "</p>" +
-        "<div class='tm-store-meta'>Status: " + app.status + " | ID: " + app.id + "</div>" +
+        "<div class='tm-store-card-info'>Status: " + app.status + " | ID: " + app.id + "</div>" +
         "<div class='tm-store-state-row'>" + statusBadge + "</div>" +
         "<ul>" + changelog + "</ul>" +
         "<button data-app-toggle='" + app.id + "' class='tm-store-btn " + (enabled ? "is-on" : "is-off") + "'>" +
@@ -433,28 +433,34 @@
       ".tm-store-fab-badge.show{display:block;animation:tmPulse 1.3s infinite}" +
       "@keyframes tmPulse{0%{transform:scale(1);opacity:1}70%{transform:scale(1.35);opacity:.35}100%{transform:scale(1);opacity:1}}" +
       ".tm-store-overlay{position:fixed;inset:0;background:rgba(4,10,22,.7);backdrop-filter:blur(6px);z-index:999998;display:none;align-items:center;justify-content:center;padding:24px}" +
-      ".tm-store-panel{width:min(960px,96vw);max-height:92vh;overflow:auto;background:radial-gradient(circle at top,#1a2642 0%,#0f1628 58%,#0c1321 100%);color:#eef2ff;border:1px solid #40547a;border-radius:18px;padding:18px;box-shadow:0 30px 60px rgba(0,0,0,.45)}" +
-      ".tm-store-top{display:flex;justify-content:space-between;align-items:center;gap:8px}" +
-      ".tm-store-subtitle{margin:8px 0 0 0;color:#bcd0f5;font-size:13px}" +
-      ".tm-store-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-top:14px}" +
-      ".tm-store-card{background:linear-gradient(180deg,#1d2a45 0%,#16223a 100%);border:1px solid #46608d;border-radius:12px;padding:12px}" +
-      ".tm-store-card h4{margin:0}" +
-      ".tm-store-card p{margin:8px 0;color:#c2cde3}" +
-      ".tm-store-card ul{margin:8px 0 0 18px;padding:0;color:#9eb0d1}" +
+      ".tm-store-panel{width:min(1040px,96vw);max-height:92vh;overflow:auto;background:radial-gradient(circle at 12% -8%,#273c66 0%,#111a31 42%,#0a1120 100%);color:#eef2ff;border:1px solid #4b6290;border-radius:20px;padding:18px;box-shadow:0 30px 70px rgba(0,0,0,.5)}" +
+      ".tm-store-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding-bottom:12px;border-bottom:1px solid rgba(134,159,206,.28)}" +
+      ".tm-store-title{display:flex;flex-direction:column;gap:4px}" +
+      ".tm-store-subtitle{margin:0;color:#bcd0f5;font-size:13px}" +
+      ".tm-store-version-pill{display:inline-flex;align-items:center;gap:6px;width:fit-content;padding:4px 9px;border-radius:999px;background:rgba(73,102,160,.28);border:1px solid rgba(129,168,244,.45);font-size:12px;color:#dce9ff}" +
+      ".tm-store-meta{margin:12px 0 0 0;padding:10px 12px;border:1px solid rgba(91,123,184,.3);border-radius:12px;background:rgba(14,24,46,.45)}" +
+      ".tm-store-meta p{margin:6px 0;color:#d3def6;font-size:13px}" +
+      ".tm-store-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(295px,1fr));gap:14px;margin-top:14px}" +
+      ".tm-store-card{position:relative;background:linear-gradient(180deg,rgba(39,57,91,.92) 0%,rgba(22,36,63,.94) 100%);border:1px solid #5878b0;border-radius:14px;padding:13px;box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 12px 22px rgba(0,0,0,.25)}" +
+      ".tm-store-card::after{content:'';position:absolute;inset:0;border-radius:14px;background:linear-gradient(135deg,rgba(148,193,255,.08),rgba(255,255,255,0) 46%);pointer-events:none}" +
+      ".tm-store-card h4{margin:0;font-size:17px;letter-spacing:.3px}" +
+      ".tm-store-card p{margin:8px 0;color:#cdddff;font-size:14px}" +
+      ".tm-store-card ul{margin:8px 0 0 18px;padding:0;color:#aac0e9;font-size:13px}" +
       ".tm-store-card-head{display:flex;justify-content:space-between;align-items:center;gap:8px}" +
-      ".tm-store-meta{font-size:12px;color:#8fa0c3}" +
+      ".tm-store-card-info{font-size:12px;color:#9fb3dd}" +
       ".tm-store-state-row{margin-top:8px}" +
       ".tm-badge{display:inline-block;padding:4px 8px;border-radius:999px;font-size:12px;font-weight:700}" +
       ".tm-badge.ok{background:#175b35;color:#d5ffe7;border:1px solid #39b86f}" +
       ".tm-badge.fail{background:#631d1d;color:#ffdede;border:1px solid #d14f4f}" +
       ".tm-badge.neutral{background:#243653;color:#dbe8ff;border:1px solid #506c99}" +
-      ".tm-store-btn{margin-top:10px;padding:8px 12px;border-radius:10px;border:1px solid #6586be;background:#2e4270;color:#eef2ff;cursor:pointer;font-weight:700}" +
+      ".tm-store-btn{margin-top:10px;padding:8px 12px;border-radius:10px;border:1px solid #78a2e8;background:linear-gradient(180deg,#3e63a9 0%,#2d4a82 100%);color:#f1f6ff;cursor:pointer;font-weight:700}" +
       ".tm-store-btn.is-on{background:#7f1d1d;border-color:#ef4444}" +
-      ".tm-store-close{background:#243653;color:#e8eefc;border:1px solid #5f7baa;border-radius:10px;padding:8px 12px;cursor:pointer}" +
-      ".tm-store-debug-btn{background:#1e3a2e;color:#d7ffe5;border:1px solid #3f8b67;border-radius:10px;padding:8px 12px;cursor:pointer}" +
-      ".tm-store-update-btn{background:#493011;color:#ffe8c8;border:1px solid #c88a3a;border-radius:10px;padding:8px 12px;cursor:pointer}" +
+      ".tm-store-close{background:#263d63;color:#e8eefc;border:1px solid #7293cd;border-radius:10px;padding:8px 12px;cursor:pointer}" +
+      ".tm-store-debug-btn{background:#1f4a38;color:#d7ffe5;border:1px solid #45a67a;border-radius:10px;padding:8px 12px;cursor:pointer}" +
+      ".tm-store-update-btn{background:#5b3f13;color:#ffe8c8;border:1px solid #d59a42;border-radius:10px;padding:8px 12px;cursor:pointer}" +
       ".tm-store-link{color:#9dc2ff;text-decoration:none}" +
-      ".tm-store-update-banner{margin:10px 0;padding:10px 12px;border:1px solid #8b6a35;border-radius:10px;background:rgba(96,60,15,.35);color:#ffe9cf}" +
+      ".tm-store-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}" +
+      ".tm-store-update-banner{margin:12px 0;padding:10px 12px;border:1px solid #8b6a35;border-radius:12px;background:linear-gradient(135deg,rgba(96,60,15,.45),rgba(58,43,24,.35));color:#ffe9cf}" +
       ".tm-store-update-actions{margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}" +
       ".tm-store-confirm-btn{background:#1c5b33;color:#d7ffe5;border:1px solid #3ca86a;border-radius:8px;padding:6px 10px;cursor:pointer}" +
       ".tm-store-feedback{position:fixed;right:20px;bottom:78px;z-index:999999;background:linear-gradient(135deg,rgba(12,20,36,.96),rgba(16,31,58,.94));border:1px solid #4f6fa5;border-radius:14px;color:#eaf2ff;min-width:300px;max-width:420px;padding:10px 12px;box-shadow:0 18px 40px rgba(0,0,0,.45);backdrop-filter:blur(6px);animation:tmToastIn .22s ease-out}" +
@@ -464,7 +470,7 @@
       ".tm-store-feedback.ok li{color:#bff5d2}" +
       ".tm-store-feedback.warn li{color:#ffd3d3}" +
       "@keyframes tmToastIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}" +
-      ".tm-store-debug{margin-top:12px;border:1px solid #40547a;border-radius:10px;padding:10px;background:rgba(7,12,24,.55)}" +
+      ".tm-store-debug{margin-top:12px;border:1px solid #4f6591;border-radius:12px;padding:10px;background:rgba(8,14,29,.65)}" +
       ".tm-store-debug-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}" +
       ".tm-store-debug-pre{font-family:Consolas,monospace;font-size:12px;white-space:pre-wrap;line-height:1.35;max-height:240px;overflow:auto;color:#cfe1ff;background:#0b1220;border:1px solid #334a73;border-radius:8px;padding:8px}"
     );
@@ -542,20 +548,23 @@
     overlay.innerHTML =
       "<div class='tm-store-panel'>" +
         "<div class='tm-store-top'>" +
-          "<div>" +
+          "<div class='tm-store-title'>" +
             "<h3 style='margin:0'>Tampermonkey Store</h3>" +
-            "<p class='tm-store-subtitle'>Store-Version: v" + LOADER_LOCAL_VERSION + "</p>" +
+            "<p class='tm-store-subtitle'>Apps, Updates und Debugging zentral in einem Store.</p>" +
+            "<span class='tm-store-version-pill'>Store-Version: v" + LOADER_LOCAL_VERSION + "</span>" +
           "</div>" +
-          "<div>" +
+          "<div class='tm-store-actions'>" +
             "<button class='tm-store-update-btn' id='tm-store-update-check-btn' type='button'>Update prüfen</button> " +
             (RUNTIME.loaderUpdate.hasUpdate ? "<button class='tm-store-update-btn' id='tm-store-update-now-btn' type='button'>Jetzt aktualisieren</button> " : "") +
             "<button class='tm-store-debug-btn' id='tm-store-debug-btn' type='button'>Debug</button> " +
             "<button class='tm-store-close' id='tm-store-close' type='button'>Schließen</button>" +
           "</div>" +
         "</div>" +
-        "<p>Quelle: <a class='tm-store-link' target='_blank' href='" + REPO_URL + "'>" + REPO_URL + "</a></p>" +
+        "<div class='tm-store-meta'>" +
+          "<p><strong>Quelle:</strong> <a class='tm-store-link' target='_blank' href='" + REPO_URL + "'>" + REPO_URL + "</a></p>" +
+          "<p><strong>Governance:</strong> Apps werden über Pull Requests + Reviews in GitHub freigegeben.</p>" +
+        "</div>" +
         updateBanner +
-        "<p>Governance: Apps werden über Pull Requests + Reviews in GitHub freigegeben.</p>" +
         "<div class='tm-store-grid'>" + cards + "</div>" +
         "<div class='tm-store-debug' id='tm-store-debug' style='display:none'>" +
           "<div class='tm-store-debug-head'><strong>Debug-Logs</strong><button class='tm-store-close' id='tm-store-debug-refresh' type='button'>Aktualisieren</button></div>" +
