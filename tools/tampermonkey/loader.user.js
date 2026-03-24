@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Klixa TM Store Loader
 // @namespace    klixa.tm.store
-// @version      0.4.10
+// @version      0.4.11
 // @author LWE
 // @description  Loads approved Intranet apps from GitHub Raw manifest
 // @match        https://intranet.klixa.ch/*
@@ -388,6 +388,29 @@
     logInfo("Manifest geladen von", MANIFEST_URL);
     addLog("info", "network", "Manifest erfolgreich geladen", { url: MANIFEST_URL });
     return payload;
+  }
+
+  async function refreshRegistryInBackground() {
+    try {
+      var payload = await fetchRegistry();
+      saveRegistryCache(payload);
+      var apps = payload && Array.isArray(payload.apps) ? payload.apps : [];
+      RUNTIME.apps = apps;
+      RUNTIME.registryUpdatedAt = payload && payload.updatedAt ? payload.updatedAt : null;
+      if (document.body) {
+        renderStoreOverlay(RUNTIME.apps, loadSettings());
+      }
+      addLog("info", "network", "Manifest im Hintergrund aktualisiert", {
+        apps: apps.length,
+        updatedAt: RUNTIME.registryUpdatedAt || null
+      });
+      return true;
+    } catch (err) {
+      addLog("error", "network", "Manifest-Hintergrundupdate fehlgeschlagen", {
+        error: err && err.message ? err.message : "Unbekannt"
+      });
+      return false;
+    }
   }
 
   function isApprovedAndPublished(app) {
@@ -1051,8 +1074,11 @@
       var settings = loadSettings();
       var delay = getUpdateIntervalMs(settings);
       RUNTIME.updateTimerId = window.setTimeout(function () {
-        checkLoaderUpdate(false).then(function () {
-          if (document.body && RUNTIME.apps && RUNTIME.apps.length) {
+        Promise.all([
+          checkLoaderUpdate(false),
+          refreshRegistryInBackground()
+        ]).then(function () {
+          if (document.body) {
             renderStoreOverlay(RUNTIME.apps, loadSettings());
           }
         }).finally(function () {
