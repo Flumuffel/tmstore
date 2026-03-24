@@ -1,9 +1,13 @@
-// ==UserScript==
-// @name             klixa enhancements - Darkmode
-// @match            https://intranet.klixa.ch/*
-// @version          2.0
-// @grant            none
-// ==/UserScript==
+/* ==TMStoreApp==
+@id klixa-enhancements
+@name Klixa Enhancements
+@version 2.0.0
+@description Legacy Enhancements
+@status published
+@approved true
+@match ^https:\/\/intranet\.klixa\.ch\/.*$
+@changelog Legacy old-loader 1:1 übernommen
+==/TMStoreApp== */
 
 // 1. Online-Benutzerliste anpassen
 const onlineElement = document.getElementById("online");
