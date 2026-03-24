@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Klixa TM Store Loader
 // @namespace    klixa.tm.store
-// @version      0.4.18
+// @version      0.4.19
 // @author LWE
 // @description  Loads approved Intranet apps from GitHub Raw manifest
 // @match        https://intranet.klixa.ch/*
@@ -901,7 +901,7 @@
         "Logs: " + (RUNTIME.logs.length) + "\n\n";
       var lines = RUNTIME.logs.slice(-120).map(function (l) {
         var data = l.data ? " | " + JSON.stringify(l.data) : "";
-        return "[" + l.at + "] [" + l.level.toUpperCase() + "] [" + l.scope + "] " + l.message + data;
+        return "[" + formatDateTimeBerlin(l.at, true) + "] [" + l.level.toUpperCase() + "] [" + l.scope + "] " + l.message + data;
       }).join("\n");
       target.textContent = header + (lines || "Keine Logs vorhanden.");
     }
@@ -1058,12 +1058,18 @@
     }
 
     try {
-      addLog("info", "update", "Prüfe Loader-Update (GitHub API)", { url: LOADER_CONTENT_API_URL });
-      var apiTxt = await gmRequest(LOADER_CONTENT_API_URL + "&t=" + now());
-      var apiObj = safeParse(apiTxt, null);
       var remoteSource = "";
-      if (apiObj && apiObj.content) {
-        remoteSource = decodeBase64Utf8(apiObj.content);
+      try {
+        addLog("info", "update", "Prüfe Loader-Update (GitHub API)", { url: LOADER_CONTENT_API_URL });
+        var apiTxt = await gmRequest(LOADER_CONTENT_API_URL + "&t=" + now());
+        var apiObj = safeParse(apiTxt, null);
+        if (apiObj && apiObj.content) {
+          remoteSource = decodeBase64Utf8(apiObj.content);
+        }
+      } catch (apiErr) {
+        addLog("error", "update", "GitHub API fehlgeschlagen, nutze Raw-Fallback", {
+          error: apiErr && apiErr.message ? apiErr.message : "Unbekannt"
+        });
       }
       if (!remoteSource) {
         var updateUrl = LOADER_REMOTE_URL + "?t=" + now() + "&r=" + Math.random().toString(36).slice(2);
