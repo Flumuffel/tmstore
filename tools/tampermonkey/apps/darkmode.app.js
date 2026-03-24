@@ -11,11 +11,20 @@
     link.rel = "stylesheet";
     link.href = CSS_URL;
     document.head.appendChild(link);
+    if (window.__TM_STORE_DEBUG && typeof window.__TM_STORE_DEBUG.log === "function") {
+      window.__TM_STORE_DEBUG.log("app:darkmode", "CSS-Link eingefügt", { cssUrl: CSS_URL });
+    }
   }
 
   function applyClass() {
     document.documentElement.classList.add("tm-darkmode");
     document.body.classList.add("tm-darkmode");
+    if (window.__TM_STORE_DEBUG && typeof window.__TM_STORE_DEBUG.log === "function") {
+      window.__TM_STORE_DEBUG.log("app:darkmode", "Darkmode-Klasse gesetzt", {
+        html: document.documentElement.classList.contains("tm-darkmode"),
+        body: document.body.classList.contains("tm-darkmode")
+      });
+    }
   }
 
   function showAppliedToast() {
@@ -43,12 +52,18 @@
   }
 
   function boot() {
+    if (window.__TM_STORE_DEBUG && typeof window.__TM_STORE_DEBUG.log === "function") {
+      window.__TM_STORE_DEBUG.log("app:darkmode", "Darkmode Boot gestartet");
+    }
     injectCssLink();
     if (document.body) {
       applyClass();
       showAppliedToast();
     } else {
       document.addEventListener("DOMContentLoaded", function () {
+        if (window.__TM_STORE_DEBUG && typeof window.__TM_STORE_DEBUG.log === "function") {
+          window.__TM_STORE_DEBUG.log("app:darkmode", "DOMContentLoaded erreicht");
+        }
         applyClass();
         showAppliedToast();
       });

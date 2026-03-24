@@ -1,9 +1,11 @@
 // ==UserScript==
 // @name         Klixa TM Store Loader
 // @namespace    klixa.tm.store
-// @version      0.2.0
+// @version      0.2.1
 // @description  Loads approved Intranet apps from GitHub Raw manifest
 // @match        https://intranet.klixa.ch/*
+// @updateURL    https://raw.githubusercontent.com/Flumuffel/tmstore/refs/heads/main/tools/tampermonkey/loader.user.js
+// @downloadURL  https://raw.githubusercontent.com/Flumuffel/tmstore/refs/heads/main/tools/tampermonkey/loader.user.js
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_xmlhttpRequest
@@ -26,7 +28,7 @@
   var SETTINGS_KEY = "tm_store_settings_v1";
   var DEFAULT_SETTINGS = {
     enabledApps: {
-      darkmode: false
+      darkmode: true
     },
     ui: {
       open: false
@@ -35,8 +37,30 @@
   var RUNTIME = {
     apps: [],
     loaded: {},
-    status: []
+    status: [],
+    logs: []
   };
+
+  function addLog(level, scope, message, data) {
+    var entry = {
+      at: new Date().toISOString(),
+      level: level || "info",
+      scope: scope || "store",
+      message: message || "",
+      data: data || null
+    };
+    RUNTIME.logs.push(entry);
+    if (RUNTIME.logs.length > 250) {
+      RUNTIME.logs.shift();
+    }
+    try {
+      if (entry.level === "error") {
+        console.error("[TM-STORE][" + entry.scope + "]", entry.message, entry.data || "");
+      } else {
+        console.log("[TM-STORE][" + entry.scope + "]", entry.message, entry.data || "");
+      }
+    } catch (err) {}
+  }
 
   function now() {
     return Date.now();
@@ -44,6 +68,7 @@
 
   function logInfo(msg, data) {
     console.info("[TM-STORE]", msg, data || "");
+    addLog("info", "store", msg, data || null);
   }
 
   function safeParse(json, fallback) {
@@ -150,6 +175,7 @@
       throw new Error("Invalid registry payload");
     }
     logInfo("Manifest geladen von", MANIFEST_URL);
+    addLog("info", "network", "Manifest erfolgreich geladen", { url: MANIFEST_URL });
     return payload;
   }
 
@@ -162,13 +188,23 @@
   }
 
   async function runApp(app) {
+    addLog("info", "app:" + app.id, "Lade App-Bundle", { url: app.bundleUrl, version: app.version });
     var code = await gmRequestText(app.bundleUrl);
     if (app.sha256) {
       var hash = await sha256Hex(code);
       if (!hash || !equalsIgnoreCase(hash, app.sha256)) {
+        addLog("error", "app:" + app.id, "SHA256 stimmt nicht", { expected: app.sha256, actual: hash });
         throw new Error("SHA256 mismatch for " + app.id);
       }
     }
+    window.__TM_STORE_DEBUG = {
+      log: function (scope, message, data) {
+        addLog("info", scope || ("app:" + app.id), message || "", data || null);
+      },
+      error: function (scope, message, data) {
+        addLog("error", scope || ("app:" + app.id), message || "", data || null);
+      }
+    };
     window.__TM_STORE_CONTEXT = {
       appId: app.id,
       appVersion: app.version,
@@ -185,6 +221,7 @@
       return { ok: true, message: "Geladen" };
     } catch (err) {
       console.error("[TM-STORE] Failed to run app " + app.id, err);
+      addLog("error", "app:" + app.id, "App-Ausführung fehlgeschlagen", { error: err && err.message ? err.message : "Unbekannt" });
       return { ok: false, message: "Laufzeitfehler: " + (err && err.message ? err.message : "Unbekannt") };
     }
   }
@@ -281,13 +318,17 @@
       ".tm-store-btn{margin-top:10px;padding:8px 12px;border-radius:10px;border:1px solid #6586be;background:#2e4270;color:#eef2ff;cursor:pointer;font-weight:700}" +
       ".tm-store-btn.is-on{background:#7f1d1d;border-color:#ef4444}" +
       ".tm-store-close{background:#243653;color:#e8eefc;border:1px solid #5f7baa;border-radius:10px;padding:8px 12px;cursor:pointer}" +
+      ".tm-store-debug-btn{background:#1e3a2e;color:#d7ffe5;border:1px solid #3f8b67;border-radius:10px;padding:8px 12px;cursor:pointer}" +
       ".tm-store-link{color:#9dc2ff;text-decoration:none}" +
       ".tm-store-feedback{position:fixed;left:50%;top:18px;transform:translateX(-50%);z-index:999999;background:#101a2e;border:1px solid #4c628f;border-radius:12px;color:#e9f0ff;min-width:360px;max-width:92vw;padding:10px 12px;box-shadow:0 14px 30px rgba(0,0,0,.4)}" +
       ".tm-store-feedback h4{margin:0 0 8px 0;font-size:14px}" +
       ".tm-store-feedback ul{margin:0;padding-left:18px}" +
       ".tm-store-feedback li{font-size:13px;margin:2px 0}" +
       ".tm-store-feedback.ok li{color:#bff5d2}" +
-      ".tm-store-feedback.warn li{color:#ffd3d3}"
+      ".tm-store-feedback.warn li{color:#ffd3d3}" +
+      ".tm-store-debug{margin-top:12px;border:1px solid #40547a;border-radius:10px;padding:10px;background:rgba(7,12,24,.55)}" +
+      ".tm-store-debug-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}" +
+      ".tm-store-debug-pre{font-family:Consolas,monospace;font-size:12px;white-space:pre-wrap;line-height:1.35;max-height:240px;overflow:auto;color:#cfe1ff;background:#0b1220;border:1px solid #334a73;border-radius:8px;padding:8px}"
     );
     var styleMarker = document.createElement("meta");
     styleMarker.id = "tm-store-style";
@@ -336,17 +377,51 @@
       "<div class='tm-store-panel'>" +
         "<div class='tm-store-top'>" +
           "<h3>Tampermonkey Store</h3>" +
-          "<button class='tm-store-close' id='tm-store-close' type='button'>Schliessen</button>" +
+          "<div>" +
+            "<button class='tm-store-debug-btn' id='tm-store-debug-btn' type='button'>Debug</button> " +
+            "<button class='tm-store-close' id='tm-store-close' type='button'>Schließen</button>" +
+          "</div>" +
         "</div>" +
         "<p>Quelle: <a class='tm-store-link' target='_blank' href='" + REPO_URL + "'>" + REPO_URL + "</a></p>" +
         "<p>Governance: Apps werden über Pull Requests + Reviews in GitHub freigegeben.</p>" +
         "<div class='tm-store-grid'>" + cards + "</div>" +
+        "<div class='tm-store-debug' id='tm-store-debug' style='display:none'>" +
+          "<div class='tm-store-debug-head'><strong>Debug-Logs</strong><button class='tm-store-close' id='tm-store-debug-refresh' type='button'>Aktualisieren</button></div>" +
+          "<div class='tm-store-debug-pre' id='tm-store-debug-pre'></div>" +
+        "</div>" +
       "</div>";
 
     var close = document.getElementById("tm-store-close");
     close.addEventListener("click", function () {
       overlay.style.display = "none";
     });
+
+    var debugBtn = document.getElementById("tm-store-debug-btn");
+    var debugWrap = document.getElementById("tm-store-debug");
+    var debugRefresh = document.getElementById("tm-store-debug-refresh");
+    function renderDebugLogs() {
+      var target = document.getElementById("tm-store-debug-pre");
+      if (!target) return;
+      var enabledMap = settings.enabledApps || {};
+      var header =
+        "Manifest: " + MANIFEST_URL + "\n" +
+        "Cache-Key: " + CACHE_KEY + "\n" +
+        "Darkmode aktiviert: " + (!!enabledMap.darkmode) + "\n" +
+        "Apps im Manifest: " + (apps.length) + "\n" +
+        "Status-Einträge: " + (RUNTIME.status.length) + "\n" +
+        "Logs: " + (RUNTIME.logs.length) + "\n\n";
+      var lines = RUNTIME.logs.slice(-120).map(function (l) {
+        var data = l.data ? " | " + JSON.stringify(l.data) : "";
+        return "[" + l.at + "] [" + l.level.toUpperCase() + "] [" + l.scope + "] " + l.message + data;
+      }).join("\n");
+      target.textContent = header + (lines || "Keine Logs vorhanden.");
+    }
+    debugBtn.addEventListener("click", function () {
+      var open = debugWrap.style.display !== "none";
+      debugWrap.style.display = open ? "none" : "block";
+      if (!open) renderDebugLogs();
+    });
+    debugRefresh.addEventListener("click", renderDebugLogs);
 
     var toggles = overlay.querySelectorAll("[data-app-toggle]");
     for (var j = 0; j < toggles.length; j += 1) {
@@ -398,10 +473,18 @@
       var fallback = loadCachedRegistry();
       if (!fallback) {
         console.error("[TM-STORE] Registry fetch failed and no cache found", err);
+        addLog("error", "network", "Manifest konnte nicht geladen werden und kein Cache vorhanden", {
+          url: MANIFEST_URL,
+          error: err && err.message ? err.message : "Unbekannt"
+        });
         return;
       }
       payload = fallback.registry ? fallback.registry : fallback;
       logInfo("Using cached registry");
+      addLog("error", "network", "Manifest-Fehler, Cache wird verwendet", {
+        url: MANIFEST_URL,
+        error: err && err.message ? err.message : "Unbekannt"
+      });
     }
 
     var apps = payload.apps || [];
@@ -418,8 +501,14 @@
     for (var i = 0; i < apps.length; i += 1) {
       var app = apps[i];
       if (!isApprovedAndPublished(app)) continue;
-      if (!appIsEnabled(app.id, settings)) continue;
-      if (app.match && !new RegExp(app.match).test(window.location.href)) continue;
+      if (!appIsEnabled(app.id, settings)) {
+        addLog("info", "app:" + app.id, "Übersprungen: deaktiviert");
+        continue;
+      }
+      if (app.match && !new RegExp(app.match).test(window.location.href)) {
+        addLog("info", "app:" + app.id, "Übersprungen: URL-Match trifft nicht zu", { match: app.match, url: window.location.href });
+        continue;
+      }
       try {
         var result = await runApp(app);
         if (result && result.ok) {
