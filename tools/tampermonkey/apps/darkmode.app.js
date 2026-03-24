@@ -2,27 +2,7 @@
   "use strict";
 
   var STYLE_ID = "tm-darkmode-style";
-  var CSS_URL = "https://raw.githubusercontent.com/your-org/your-tm-store-repo/main/tools/tampermonkey/apps/darkmode.css";
-  var OPT_OUT_KEY = "tm_darkmode_optout_v1";
-
-  function loadOptOutList() {
-    try {
-      var raw = localStorage.getItem(OPT_OUT_KEY);
-      if (!raw) return {};
-      var parsed = JSON.parse(raw);
-      return parsed && typeof parsed === "object" ? parsed : {};
-    } catch (err) {
-      return {};
-    }
-  }
-
-  function saveOptOutList(list) {
-    localStorage.setItem(OPT_OUT_KEY, JSON.stringify(list));
-  }
-
-  function currentPathKey() {
-    return window.location.pathname || "/";
-  }
+  var CSS_URL = "https://raw.githubusercontent.com/Flumuffel/tmstore/main/tools/tampermonkey/apps/darkmode.css";
 
   function injectCssLink() {
     if (document.getElementById(STYLE_ID)) return;
@@ -38,70 +18,39 @@
     document.body.classList.add("tm-darkmode");
   }
 
-  function removeClass() {
-    document.documentElement.classList.remove("tm-darkmode");
-    document.body.classList.remove("tm-darkmode");
-  }
-
-  function addToggleButton() {
-    if (document.getElementById("tm-darkmode-toggle")) return;
-    var target = document.getElementById("fast_cmd_div") || document.body;
-    var btn = document.createElement("button");
-    btn.id = "tm-darkmode-toggle";
-    btn.type = "button";
-    btn.textContent = "Darkmode";
-    btn.style.marginLeft = "8px";
-    btn.style.padding = "6px 8px";
-    btn.style.border = "1px solid #4e5b78";
-    btn.style.background = "#1a2131";
-    btn.style.color = "#e8edf8";
-    btn.style.cursor = "pointer";
-    btn.addEventListener("click", function () {
-      var active = document.documentElement.classList.toggle("tm-darkmode");
-      document.body.classList.toggle("tm-darkmode", active);
-    });
-    target.appendChild(btn);
-
-    var pageBtn = document.createElement("button");
-    pageBtn.id = "tm-darkmode-page-toggle";
-    pageBtn.type = "button";
-    pageBtn.style.marginLeft = "6px";
-    pageBtn.style.padding = "6px 8px";
-    pageBtn.style.border = "1px solid #4e5b78";
-    pageBtn.style.background = "#1a2131";
-    pageBtn.style.color = "#e8edf8";
-    pageBtn.style.cursor = "pointer";
-    function refreshPageButtonText() {
-      var optOut = loadOptOutList();
-      pageBtn.textContent = optOut[currentPathKey()] ? "Darkmode fuer Seite AN" : "Darkmode fuer Seite AUS";
-    }
-    pageBtn.addEventListener("click", function () {
-      var optOut = loadOptOutList();
-      var key = currentPathKey();
-      optOut[key] = !optOut[key];
-      saveOptOutList(optOut);
-      if (optOut[key]) {
-        removeClass();
-      } else {
-        applyClass();
-      }
-      refreshPageButtonText();
-    });
-    refreshPageButtonText();
-    target.appendChild(pageBtn);
+  function showAppliedToast() {
+    if (document.getElementById("tm-darkmode-toast")) return;
+    var toast = document.createElement("div");
+    toast.id = "tm-darkmode-toast";
+    toast.textContent = "Darkmode aktiv";
+    toast.style.position = "fixed";
+    toast.style.left = "50%";
+    toast.style.bottom = "22px";
+    toast.style.transform = "translateX(-50%)";
+    toast.style.padding = "8px 12px";
+    toast.style.borderRadius = "999px";
+    toast.style.background = "rgba(10, 18, 34, 0.86)";
+    toast.style.border = "1px solid #465f90";
+    toast.style.color = "#e8f0ff";
+    toast.style.fontSize = "12px";
+    toast.style.fontWeight = "700";
+    toast.style.zIndex = "999999";
+    toast.style.backdropFilter = "blur(4px)";
+    document.body.appendChild(toast);
+    window.setTimeout(function () {
+      if (toast && toast.parentNode) toast.parentNode.removeChild(toast);
+    }, 2600);
   }
 
   function boot() {
     injectCssLink();
-    var optOut = loadOptOutList();
-    var disabledOnPage = !!optOut[currentPathKey()];
     if (document.body) {
-      if (!disabledOnPage) applyClass();
-      addToggleButton();
+      applyClass();
+      showAppliedToast();
     } else {
       document.addEventListener("DOMContentLoaded", function () {
-        if (!disabledOnPage) applyClass();
-        addToggleButton();
+        applyClass();
+        showAppliedToast();
       });
     }
   }

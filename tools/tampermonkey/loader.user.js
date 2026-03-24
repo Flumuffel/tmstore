@@ -19,14 +19,14 @@
   var GITHUB_OWNER = "Flumuffel";
   var GITHUB_REPO = "tmstore";
   var GITHUB_REF = "main";
-  var RAW_BASE = "https://raw.githubusercontent.com/" + GITHUB_OWNER + "/" + GITHUB_REPO + "/" + GITHUB_REF;
+  var RAW_BASE = "https://raw.githubusercontent.com/" + GITHUB_OWNER + "/" + GITHUB_REPO + "/refs/heads/" + GITHUB_REF;
   var MANIFEST_URL = RAW_BASE + "/api/tm-store/apps.json";
   var REPO_URL = "https://github.com/" + GITHUB_OWNER + "/" + GITHUB_REPO;
-  var CACHE_KEY = "tm_store_cache_v1";
+  var CACHE_KEY = "tm_store_cache_v1_" + GITHUB_OWNER + "_" + GITHUB_REPO + "_" + GITHUB_REF;
   var SETTINGS_KEY = "tm_store_settings_v1";
   var DEFAULT_SETTINGS = {
     enabledApps: {
-      darkmode: true
+      darkmode: false
     },
     ui: {
       open: false
@@ -149,6 +149,7 @@
     if (!payload || !payload.apps) {
       throw new Error("Invalid registry payload");
     }
+    logInfo("Manifest geladen von", MANIFEST_URL);
     return payload;
   }
 

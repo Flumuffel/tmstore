@@ -1,17 +1,18 @@
 :root.tm-darkmode {
-  --tm-bg: #0f1218;
-  --tm-panel: #171d29;
-  --tm-card: #1f2633;
-  --tm-border: #2b3448;
-  --tm-text: #e8edf8;
-  --tm-muted: #aab4c8;
-  --tm-link: #82b2ff;
+  --tm-bg: #0c1018;
+  --tm-panel: #141b2a;
+  --tm-card: #1a2438;
+  --tm-border: #31405d;
+  --tm-text: #eaf1ff;
+  --tm-muted: #b1bed9;
+  --tm-link: #8bb9ff;
 }
 
 html.tm-darkmode,
 body.tm-darkmode {
   background: var(--tm-bg) !important;
   color: var(--tm-text) !important;
+  text-rendering: optimizeLegibility;
 }
 
 .tm-darkmode #centermid,
@@ -30,17 +31,25 @@ body.tm-darkmode {
   border-color: var(--tm-border) !important;
 }
 
+.tm-darkmode .gadget,
+.tm-darkmode #main,
+.tm-darkmode .container {
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+  border-radius: 8px;
+}
+
 .tm-darkmode .odd {
-  background-color: #172030 !important;
+  background-color: #17233a !important;
 }
 
 .tm-darkmode .even {
-  background-color: #1d2739 !important;
+  background-color: #1c2b43 !important;
 }
 
 .tm-darkmode a,
 .tm-darkmode a:visited {
   color: var(--tm-link) !important;
+  text-decoration-color: rgba(139, 185, 255, 0.5);
 }
 
 .tm-darkmode input,
@@ -49,6 +58,22 @@ body.tm-darkmode {
   background: var(--tm-card) !important;
   color: var(--tm-text) !important;
   border: 1px solid var(--tm-border) !important;
+  border-radius: 6px;
+}
+
+.tm-darkmode .header_wrap,
+.tm-darkmode .footer_bar,
+.tm-darkmode .info_bar {
+  background: linear-gradient(180deg, #111a2a 0%, #0f1727 100%) !important;
+  color: var(--tm-text) !important;
+}
+
+.tm-darkmode #menu_top a {
+  color: #dce9ff !important;
+}
+
+.tm-darkmode #menu_top li:hover > a {
+  background: #223555 !important;
 }
 
 /* Keep warning colors intact where semantic colors matter. */
