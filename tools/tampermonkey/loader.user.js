@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Klixa TM Store Loader
 // @namespace    klixa.tm.store
-// @version      0.4.12
+// @version      0.4.13
 // @author LWE
 // @description  Loads approved Intranet apps from GitHub Raw manifest
 // @match        https://intranet.klixa.ch/*
@@ -1220,54 +1220,11 @@
     }, 350);
   }
 
-  async function boot() {
-    RUNTIME.loaderUpdate = normalizeUpdateStateWithLocalVersion(loadUpdateState());
-    startPeriodicUpdateChecks();
-    checkLoaderUpdate(true).then(function () {
-      if (document.body) {
-        renderStoreOverlay(RUNTIME.apps, loadSettings());
-      }
-    });
-
-    var settings = loadSettings();
-    var payload;
-
-    try {
-      payload = await fetchRegistry();
-      saveRegistryCache(payload);
-    } catch (err) {
-      var fallback = loadCachedRegistry();
-      if (!fallback) {
-        console.error("[TM-STORE] Registry fetch failed and no cache found", err);
-        addLog("error", "network", "Manifest konnte nicht geladen werden und kein Cache vorhanden", {
-          url: MANIFEST_URL,
-          error: err && err.message ? err.message : "Unbekannt"
-        });
-        return;
-      }
-      payload = fallback.registry ? fallback.registry : fallback;
-      logInfo("Using cached registry");
-      addLog("error", "network", "Manifest-Fehler, Cache wird verwendet", {
-        url: MANIFEST_URL,
-        error: err && err.message ? err.message : "Unbekannt"
-      });
-    }
-
-    var apps = payload.apps || [];
-    RUNTIME.apps = apps;
-    RUNTIME.registryUpdatedAt = payload.updatedAt || null;
-    if (document.body) {
-      renderStoreOverlay(apps, settings);
-      renderBootFeedback();
-    } else {
-      document.addEventListener("DOMContentLoaded", function () {
-        renderStoreOverlay(apps, settings);
-        renderBootFeedback();
-      });
-    }
+  async function runEnabledApps(apps, settings) {
     for (var i = 0; i < apps.length; i += 1) {
       var app = apps[i];
       if (!isApprovedAndPublished(app)) continue;
+      if (RUNTIME.loaded[app.id]) continue;
       if (!appIsEnabled(app.id, settings)) {
         addLog("info", "app:" + app.id, "Übersprungen: deaktiviert");
         continue;
@@ -1297,9 +1254,70 @@
         });
       }
     }
+  }
+
+  async function boot() {
+    RUNTIME.loaderUpdate = normalizeUpdateStateWithLocalVersion(loadUpdateState());
+    startPeriodicUpdateChecks();
+    checkLoaderUpdate(true).then(function () {
+      if (document.body) {
+        renderStoreOverlay(RUNTIME.apps, loadSettings());
+      }
+    });
+
+    var settings = loadSettings();
+    var cached = loadCachedRegistry();
+    if (cached) {
+      var cachedPayload = cached.registry ? cached.registry : cached;
+      var cachedApps = cachedPayload && Array.isArray(cachedPayload.apps) ? cachedPayload.apps : [];
+      if (cachedApps.length) {
+        RUNTIME.apps = cachedApps;
+        RUNTIME.registryUpdatedAt = cachedPayload.updatedAt || null;
+        if (document.body) {
+          renderStoreOverlay(cachedApps, settings);
+        } else {
+          document.addEventListener("DOMContentLoaded", function () {
+            renderStoreOverlay(cachedApps, settings);
+          });
+        }
+        await runEnabledApps(cachedApps, settings);
+      }
+    }
+
+    var payload;
+    try {
+      payload = await fetchRegistry();
+      saveRegistryCache(payload);
+    } catch (err) {
+      if (!cached) {
+        console.error("[TM-STORE] Registry fetch failed and no cache found", err);
+        addLog("error", "network", "Manifest konnte nicht geladen werden und kein Cache vorhanden", {
+          url: MANIFEST_URL,
+          error: err && err.message ? err.message : "Unbekannt"
+        });
+        return;
+      }
+      payload = cached.registry ? cached.registry : cached;
+      logInfo("Using cached registry");
+      addLog("error", "network", "Manifest-Fehler, Cache wird verwendet", {
+        url: MANIFEST_URL,
+        error: err && err.message ? err.message : "Unbekannt"
+      });
+    }
+
+    var apps = payload.apps || [];
+    RUNTIME.apps = apps;
+    RUNTIME.registryUpdatedAt = payload.updatedAt || null;
     if (document.body) {
       renderStoreOverlay(apps, settings);
-      renderBootFeedback();
+    } else {
+      document.addEventListener("DOMContentLoaded", function () {
+        renderStoreOverlay(apps, settings);
+      });
+    }
+    await runEnabledApps(apps, settings);
+    if (document.body) {
+      renderStoreOverlay(apps, settings);
     }
   }
 
