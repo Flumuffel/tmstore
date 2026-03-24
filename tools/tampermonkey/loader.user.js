@@ -30,7 +30,13 @@
   var SETTINGS_KEY = "tm_store_settings_v1";
   var UPDATE_CHECK_KEY = "tm_store_loader_update_check_v1";
   var UPDATE_ACK_KEY = "tm_store_loader_update_ack_v1";
-  var LOADER_LOCAL_VERSION = "0.2.3";
+  var LOADER_LOCAL_VERSION =
+    (typeof GM_info !== "undefined" &&
+      GM_info &&
+      GM_info.script &&
+      GM_info.script.version)
+      ? String(GM_info.script.version)
+      : "0.2.3";
   var UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
   var DEFAULT_SETTINGS = {
     enabledApps: {
