@@ -7,9 +7,10 @@
 @status published
 @approved true
 @match ^https:\/\/intranet\.klixa\.ch\/.*$
-@settings modul1 toggle true
-@settings modul2 string ""
-@changelog Legacy old-loader 1:1 übernommen
+@changelog Darkmode wird ohne Buttons automatisch aktiviert
+@changelog Kürzeln in Online-Liste sortierbar
+@changelog Schwarze Balken in Online-Liste rot
+@changelog Gleitzeit-Gadget angepasst
 ==/TMStoreApp== */
 
 // 1. Online-Benutzerliste anpassen
