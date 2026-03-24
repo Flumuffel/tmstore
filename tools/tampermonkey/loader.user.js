@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Klixa TM Store Loader
 // @namespace    klixa.tm.store
-// @version      0.4.11
+// @version      0.4.12
 // @author LWE
 // @description  Loads approved Intranet apps from GitHub Raw manifest
 // @match        https://intranet.klixa.ch/*
@@ -1075,7 +1075,7 @@
       var delay = getUpdateIntervalMs(settings);
       RUNTIME.updateTimerId = window.setTimeout(function () {
         Promise.all([
-          checkLoaderUpdate(false),
+          checkLoaderUpdate(true),
           refreshRegistryInBackground()
         ]).then(function () {
           if (document.body) {
