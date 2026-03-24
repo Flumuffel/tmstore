@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Klixa TM Store Loader
 // @namespace    klixa.tm.store
-// @version      0.4.3
+// @version      0.4.4
 // @description  Loads approved Intranet apps from GitHub Raw manifest
 // @match        https://intranet.klixa.ch/*
 // @updateURL    https://raw.githubusercontent.com/Flumuffel/tmstore/refs/heads/main/tools/tampermonkey/loader.user.js
@@ -540,9 +540,9 @@
       ".tm-store-field label{font-size:12px;color:#bdd1f5}" +
       ".tm-store-field select,.tm-store-field textarea,.tm-store-field input{background:#0d1629;color:#e8f1ff;border:1px solid #4f6591;border-radius:8px;padding:8px;font-size:12px}" +
       ".tm-store-field .tm-store-toggle{width:auto;accent-color:#6ea8ff}" +
-      ".tm-store-app-settings{margin-top:10px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}" +
-      ".tm-store-app-setting-item{border:1px solid #425a85;border-radius:10px;padding:10px;background:rgba(15,23,42,.5);display:grid;grid-template-columns:1fr;gap:8px}" +
-      ".tm-store-app-setting-item-title{font-weight:700}" +
+      ".tm-store-app-settings{margin-top:10px;display:grid;gap:10px}" +
+      ".tm-store-app-setting-item{border:1px solid #425a85;border-radius:10px;padding:10px;background:rgba(15,23,42,.5);display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}" +
+      ".tm-store-app-setting-item-title{font-weight:700;grid-column:1 / -1}" +
       ".tm-store-hidden{display:none !important}"
     ;
     root.appendChild(style);
