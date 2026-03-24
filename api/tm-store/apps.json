@@ -1,9 +1,5 @@
 {
-<<<<<<< HEAD
   "updatedAt": "2026-03-24T08:59:56Z",
-=======
-  "updatedAt": "2026-03-24T08:56:04Z",
->>>>>>> 2280ef56176a17f6c394bd21a355034c1b49c989
   "source": {
     "type": "github",
     "repository": "https://github.com/Flumuffel/tmstore",
@@ -11,42 +7,7 @@
     "generatedBy": "tools/tampermonkey/build_registry.py"
   },
   "apps": [
-<<<<<<< HEAD
     
-=======
-    {
-      "id": "darkmode",
-      "name": "Darkmode",
-      "description": "Dunkles Theme für das Intranet",
-      "version": "0.2.5",
-      "status": "published",
-      "approved": true,
-      "bundleUrl": "https://raw.githubusercontent.com/Flumuffel/tmstore/refs/heads/main/tools/tampermonkey/apps/darkmode.app.js",
-      "cssUrl": "https://raw.githubusercontent.com/Flumuffel/tmstore/refs/heads/main/tools/tampermonkey/apps/darkmode.css",
-      "match": "^https:\\/\\/intranet\\.klixa\\.ch\\/.*$",
-      "sha256": "",
-      "changelog": [
-        "Darkmode wird ohne Buttons automatisch aktiviert",
-        "Futuristisches UI-Feedback eingebaut"
-      ]
-    },
-    {
-      "id": "klixa-enhancements",
-      "name": "Klixa Enhancements",
-      "description": "Zusatzfunktionen für Online-Liste, Gleitzeit-Ansicht und erweitertes Dark-UI",
-      "version": "1.0.0",
-      "status": "published",
-      "approved": true,
-      "bundleUrl": "https://raw.githubusercontent.com/Flumuffel/tmstore/refs/heads/main/tools/tampermonkey/apps/klixa-enhancements/klixa-enhancements.app.js",
-      "cssUrl": "",
-      "match": "^https:\\/\\/intranet\\.klixa\\.ch\\/.*$",
-      "sha256": "",
-      "changelog": [
-        "Neue Enhancement-App in eigenem Ordner",
-        "Online-Liste mit Kürzeln sortieren und Gleitzeit optimieren"
-      ]
-    }
->>>>>>> 2280ef56176a17f6c394bd21a355034c1b49c989
   ],
   "submissionQueue": []
 }
