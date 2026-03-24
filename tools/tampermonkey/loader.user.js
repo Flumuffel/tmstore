@@ -437,12 +437,13 @@
       ".tm-store-update-banner{margin:10px 0;padding:10px 12px;border:1px solid #8b6a35;border-radius:10px;background:rgba(96,60,15,.35);color:#ffe9cf}" +
       ".tm-store-update-actions{margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}" +
       ".tm-store-confirm-btn{background:#1c5b33;color:#d7ffe5;border:1px solid #3ca86a;border-radius:8px;padding:6px 10px;cursor:pointer}" +
-      ".tm-store-feedback{position:fixed;left:50%;top:18px;transform:translateX(-50%);z-index:999999;background:#101a2e;border:1px solid #4c628f;border-radius:12px;color:#e9f0ff;min-width:360px;max-width:92vw;padding:10px 12px;box-shadow:0 14px 30px rgba(0,0,0,.4)}" +
-      ".tm-store-feedback h4{margin:0 0 8px 0;font-size:14px}" +
-      ".tm-store-feedback ul{margin:0;padding-left:18px}" +
-      ".tm-store-feedback li{font-size:13px;margin:2px 0}" +
+      ".tm-store-feedback{position:fixed;right:20px;bottom:78px;z-index:999999;background:linear-gradient(135deg,rgba(12,20,36,.96),rgba(16,31,58,.94));border:1px solid #4f6fa5;border-radius:14px;color:#eaf2ff;min-width:300px;max-width:420px;padding:10px 12px;box-shadow:0 18px 40px rgba(0,0,0,.45);backdrop-filter:blur(6px);animation:tmToastIn .22s ease-out}" +
+      ".tm-store-feedback h4{margin:0 0 6px 0;font-size:13px}" +
+      ".tm-store-feedback ul{margin:0;padding-left:16px}" +
+      ".tm-store-feedback li{font-size:12px;margin:2px 0}" +
       ".tm-store-feedback.ok li{color:#bff5d2}" +
       ".tm-store-feedback.warn li{color:#ffd3d3}" +
+      "@keyframes tmToastIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}" +
       ".tm-store-debug{margin-top:12px;border:1px solid #40547a;border-radius:10px;padding:10px;background:rgba(7,12,24,.55)}" +
       ".tm-store-debug-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}" +
       ".tm-store-debug-pre{font-family:Consolas,monospace;font-size:12px;white-space:pre-wrap;line-height:1.35;max-height:240px;overflow:auto;color:#cfe1ff;background:#0b1220;border:1px solid #334a73;border-radius:8px;padding:8px}"
@@ -521,7 +522,10 @@
     overlay.innerHTML =
       "<div class='tm-store-panel'>" +
         "<div class='tm-store-top'>" +
-          "<h3>Tampermonkey Store</h3>" +
+          "<div>" +
+            "<h3 style='margin:0'>Tampermonkey Store</h3>" +
+            "<p class='tm-store-subtitle'>Store-Version: v" + LOADER_LOCAL_VERSION + "</p>" +
+          "</div>" +
           "<div>" +
             "<button class='tm-store-update-btn' id='tm-store-update-check-btn' type='button'>Update prüfen</button> " +
             (RUNTIME.loaderUpdate.hasUpdate ? "<button class='tm-store-update-btn' id='tm-store-update-now-btn' type='button'>Jetzt aktualisieren</button> " : "") +
@@ -667,12 +671,12 @@
     }
     host.className = "tm-store-feedback " + (failCount > 0 ? "warn" : "ok");
     host.innerHTML =
-      "<h4>TM Store Status • Geladen: " + okCount + " • Fehler: " + failCount + "</h4>" +
+      "<h4>Systemstatus • Geladen: " + okCount + " • Fehler: " + failCount + "</h4>" +
       "<ul>" + list + "</ul>";
     window.setTimeout(function () {
       var current = document.getElementById("tm-store-feedback");
       if (current) current.remove();
-    }, 7000);
+    }, 4200);
   }
 
   async function boot() {
