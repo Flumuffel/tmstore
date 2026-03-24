@@ -4,7 +4,7 @@ on:
   push:
     branches: [ "main" ]
     paths:
-      - "tools/tampermonkey/apps/*.app.js"
+      - "tools/tampermonkey/apps/**/*.app.js"
       - "tools/tampermonkey/build_registry.py"
   workflow_dispatch:
 

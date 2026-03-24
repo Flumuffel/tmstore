@@ -80,7 +80,7 @@ def main() -> None:
     raw_base = f"https://raw.githubusercontent.com/{args.repo_owner}/{args.repo_name}/refs/heads/{args.ref}"
 
     apps = []
-    for js_file in sorted(apps_dir.glob("*.app.js")):
+    for js_file in sorted(apps_dir.rglob("*.app.js")):
         content = js_file.read_text(encoding="utf-8")
         meta = parse_header(content)
         required = ["id", "version", "match"]

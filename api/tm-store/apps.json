@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-03-24T08:46:29Z",
+  "updatedAt": "2026-03-24T08:54:28Z",
   "source": {
     "type": "github",
     "repository": "https://github.com/Flumuffel/tmstore",
@@ -21,6 +21,22 @@
       "changelog": [
         "Darkmode wird ohne Buttons automatisch aktiviert",
         "Futuristisches UI-Feedback eingebaut"
+      ]
+    },
+    {
+      "id": "klixa-enhancements",
+      "name": "Klixa Enhancements",
+      "description": "Zusatzfunktionen für Online-Liste, Gleitzeit-Ansicht und erweitertes Dark-UI",
+      "version": "1.0.0",
+      "status": "published",
+      "approved": true,
+      "bundleUrl": "https://raw.githubusercontent.com/Flumuffel/tmstore/refs/heads/main/tools/tampermonkey/apps/klixa-enhancements/klixa-enhancements.app.js",
+      "cssUrl": "",
+      "match": "^https:\\/\\/intranet\\.klixa\\.ch\\/.*$",
+      "sha256": "",
+      "changelog": [
+        "Neue Enhancement-App in eigenem Ordner",
+        "Online-Liste mit Kürzeln sortieren und Gleitzeit optimieren"
       ]
     }
   ],

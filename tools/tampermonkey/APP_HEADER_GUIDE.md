@@ -1,6 +1,12 @@
 # TM Store App Header Guide
 
-Jede App in `tools/tampermonkey/apps/*.app.js` braucht einen Header:
+Jede App in `tools/tampermonkey/apps/**/*.app.js` braucht einen Header.
+
+Beispiele:
+
+- `tools/tampermonkey/apps/darkmode.app.js`
+- `tools/tampermonkey/apps/darkmode/darkmode.app.js`
+- `tools/tampermonkey/apps/darky/darky.app.js`
 
 ```text
 /* ==TMStoreApp==
