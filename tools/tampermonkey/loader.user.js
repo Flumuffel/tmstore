@@ -55,7 +55,8 @@
       open: false
     },
     update: {
-      intervalMs: UPDATE_CHECK_INTERVAL_MS
+      intervalMs: UPDATE_CHECK_INTERVAL_MS,
+      notifyPeriodicToast: true
     },
     appSettings: {}
   };
@@ -242,6 +243,9 @@
     if (!parsed.update.intervalMs || Number(parsed.update.intervalMs) < 60 * 1000) {
       parsed.update.intervalMs = UPDATE_CHECK_INTERVAL_MS;
     }
+    if (typeof parsed.update.notifyPeriodicToast !== "boolean") {
+      parsed.update.notifyPeriodicToast = true;
+    }
     parsed.appSettings = parsed.appSettings || {};
     GM_setValue(SETTINGS_KEY, JSON.stringify(parsed));
     return parsed;
@@ -293,7 +297,7 @@
     }
   }
 
-  function formatDateTimeBerlin(value) {
+  function formatDateTimeBerlin(value, withSeconds) {
     if (!value) return "-";
     var dt = new Date(Number(value) || String(value));
     if (isNaN(dt.getTime())) return "-";
@@ -305,6 +309,7 @@
         day: "2-digit",
         hour: "2-digit",
         minute: "2-digit",
+        second: withSeconds ? "2-digit" : undefined,
         hour12: false
       }).format(dt);
     } catch (err) {
@@ -726,9 +731,9 @@
     var updateHas = !!RUNTIME.loaderUpdate.hasUpdate;
     var updateChipClass = updateHas ? (updateAcked ? "neutral" : "warn") : "ok";
     var updateChipText = updateHas ? (updateAcked ? "Update bestätigt" : "Update verfügbar") : "Aktuell";
-    var checkedAtText = formatDateTimeBerlin(RUNTIME.loaderUpdate.checkedAt);
+    var checkedAtText = formatDateTimeBerlin(RUNTIME.loaderUpdate.checkedAt, true);
     var nextCheckTs = RUNTIME.loaderUpdate.checkedAt ? (Number(RUNTIME.loaderUpdate.checkedAt) + Number(getUpdateIntervalMs(settings))) : 0;
-    var nextCheckText = nextCheckTs ? formatDateTimeBerlin(nextCheckTs) : "sofort";
+    var nextCheckText = nextCheckTs ? formatDateTimeBerlin(nextCheckTs, true) : "sofort";
 
     overlay.innerHTML =
       "<div class='tm-store-panel'>" +
@@ -793,6 +798,10 @@
               "</select>" +
             "</div>" +
             "<div class='tm-store-field'><label>Hinweis</label><input type='text' value='Update-Flow ist jetzt oben in der Update-Zentrale.' readonly></div>" +
+            "<div class='tm-store-field'>" +
+              "<label for='tm-store-update-periodic-toast'>Intervall-Mitteilungen anzeigen</label>" +
+              "<input class='tm-store-toggle' id='tm-store-update-periodic-toast' type='checkbox' " + (settings.update && settings.update.notifyPeriodicToast ? "checked" : "") + ">" +
+            "</div>" +
           "</div>" +
           "<div class='tm-store-app-settings' id='tm-store-app-settings'></div>" +
         "</div>" +
@@ -813,6 +822,7 @@
     var updateNowBtn = root.getElementById("tm-store-update-now-btn");
     var updateConfirmBtn = root.getElementById("tm-store-update-confirm-btn");
     var updateInterval = root.getElementById("tm-store-update-interval");
+    var periodicToastToggle = root.getElementById("tm-store-update-periodic-toast");
     var settingsWrap = root.getElementById("tm-store-settings");
     var appSettingsWrap = root.getElementById("tm-store-app-settings");
     var storeGrid = root.getElementById("tm-store-grid");
@@ -833,6 +843,7 @@
       var next = loadSettings();
       next.update = next.update || {};
       next.update.intervalMs = parseInt((updateInterval && updateInterval.value) || "", 10) || UPDATE_CHECK_INTERVAL_MS;
+      next.update.notifyPeriodicToast = !!(periodicToastToggle && periodicToastToggle.checked);
       next.appSettings = next.appSettings || {};
       for (var idx = 0; idx < published.length; idx += 1) {
         var app = published[idx];
@@ -1091,6 +1102,10 @@
       addLog("info", "update", "Update-Check abgeschlossen", state);
       return state;
     } catch (err) {
+      state = state || loadUpdateState();
+      state.checkedAt = now();
+      saveUpdateState(state);
+      RUNTIME.loaderUpdate = state;
       addLog("error", "update", "Update-Check fehlgeschlagen", {
         error: err && err.message ? err.message : "Unbekannt"
       });
@@ -1111,9 +1126,21 @@
           checkLoaderUpdate(true),
           refreshRegistryInBackground()
         ]).then(function () {
+          var currentSettings = loadSettings();
+          if (currentSettings.update && currentSettings.update.notifyPeriodicToast) {
+            showToast(
+              "Intervall-Check durchgeführt",
+              "Loader- und App-Manifest wurden im Hintergrund geprüft.",
+              {
+                variant: "ok",
+                duration: 2000,
+                replaceKey: "periodic-check"
+              }
+            );
+          }
           if (document.body) {
-            renderStoreOverlay(RUNTIME.apps, loadSettings());
-            syncUpdateHubInDom(loadSettings());
+            renderStoreOverlay(RUNTIME.apps, currentSettings);
+            syncUpdateHubInDom(currentSettings);
           }
         }).finally(function () {
           scheduleNextTick();
@@ -1138,9 +1165,9 @@
     statusChip.className = "tm-store-update-chip " + (updateHas ? (updateAcked ? "neutral" : "warn") : "ok");
     statusChip.textContent = updateHas ? (updateAcked ? "Update bestätigt" : "Update verfügbar") : "Aktuell";
     remote.textContent = "v" + (RUNTIME.loaderUpdate.remoteVersion || "-");
-    checked.textContent = formatDateTimeBerlin(RUNTIME.loaderUpdate.checkedAt);
+    checked.textContent = formatDateTimeBerlin(RUNTIME.loaderUpdate.checkedAt, true);
     var nextCheckTs = RUNTIME.loaderUpdate.checkedAt ? (Number(RUNTIME.loaderUpdate.checkedAt) + Number(getUpdateIntervalMs(settings))) : 0;
-    next.textContent = nextCheckTs ? formatDateTimeBerlin(nextCheckTs) : "sofort";
+    next.textContent = nextCheckTs ? formatDateTimeBerlin(nextCheckTs, true) : "sofort";
   }
 
   function renderBootFeedback() {}
