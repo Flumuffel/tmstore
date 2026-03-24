@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Klixa TM Store Loader
 // @namespace    klixa.tm.store
-// @version      0.4.7
+// @version      0.4.8
 // @author LWE
 // @description  Loads approved Intranet apps from GitHub Raw manifest
 // @match        https://intranet.klixa.ch/*
@@ -67,6 +67,7 @@
     logs: [],
     loadedCss: {},
     fastCmdApplied: {},
+    toastSeq: 0,
     loaderUpdate: {
       checkedAt: 0,
       remoteVersion: null,
@@ -485,6 +486,19 @@
       RUNTIME.loaded[appId] = false;
       RUNTIME.status.push({ appId: appId, ok: true, message: "Deaktiviert (ohne Reload)" });
       renderBootFeedback();
+      showToast(
+        "Apps deaktiviert erkannt",
+        "Um alle Änderungen sicher zu sehen, bitte Seite refreshen.",
+        {
+          variant: "warn",
+          duration: 0,
+          replaceKey: "app-deactivated-refresh",
+          actionLabel: "Refresh",
+          onAction: function () {
+            window.location.reload();
+          }
+        }
+      );
       renderStoreOverlay(RUNTIME.apps, settings);
     }
   }
@@ -584,12 +598,17 @@
       ".tm-store-update-kv strong{color:#eef3ff}" +
       ".tm-store-update-hub-actions{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap}" +
       ".tm-store-confirm-btn{background:#1c5b33;color:#d7ffe5;border:1px solid #3ca86a;border-radius:8px;padding:6px 10px;cursor:pointer}" +
-      ".tm-store-feedback{position:fixed;right:20px;bottom:78px;z-index:999999;background:linear-gradient(135deg,rgba(12,20,36,.96),rgba(16,31,58,.94));border:1px solid #4f6fa5;border-radius:14px;color:#eaf2ff;min-width:300px;max-width:420px;padding:10px 12px;box-shadow:0 18px 40px rgba(0,0,0,.45);backdrop-filter:blur(6px);animation:tmToastIn .22s ease-out}" +
-      ".tm-store-feedback h4{margin:0 0 6px 0;font-size:13px}" +
-      ".tm-store-feedback ul{margin:0;padding-left:16px}" +
-      ".tm-store-feedback li{font-size:12px;margin:2px 0}" +
-      ".tm-store-feedback.ok li{color:#bff5d2}" +
-      ".tm-store-feedback.warn li{color:#ffd3d3}" +
+      ".tm-store-toaster{position:fixed;right:18px;bottom:76px;z-index:1000000;display:flex;flex-direction:column;gap:8px;max-width:420px}" +
+      ".tm-store-toast{background:linear-gradient(145deg,rgba(12,20,36,.96),rgba(16,31,58,.94));border:1px solid #4f6fa5;border-radius:12px;color:#eaf2ff;padding:10px 12px;box-shadow:0 18px 40px rgba(0,0,0,.45);backdrop-filter:blur(6px);animation:tmToastIn .22s ease-out}" +
+      ".tm-store-toast.ok{border-color:#3ca86a}" +
+      ".tm-store-toast.warn{border-color:#d59a42}" +
+      ".tm-store-toast.error{border-color:#d14f4f}" +
+      ".tm-store-toast-head{display:flex;justify-content:space-between;align-items:center;gap:8px}" +
+      ".tm-store-toast-title{font-size:13px;font-weight:800}" +
+      ".tm-store-toast-close{background:transparent;border:0;color:#9dc2ff;cursor:pointer;font-size:14px}" +
+      ".tm-store-toast-desc{margin-top:4px;font-size:12px;color:#d7e4ff;line-height:1.4}" +
+      ".tm-store-toast-actions{margin-top:8px;display:flex;gap:8px}" +
+      ".tm-store-toast-action-btn{background:#223a61;color:#e8eefc;border:1px solid #7293cd;border-radius:8px;padding:6px 10px;cursor:pointer}" +
       "@keyframes tmToastIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}" +
       ".tm-store-debug{margin-top:12px;border:1px solid #4f6591;border-radius:12px;padding:10px;background:rgba(8,14,29,.65)}" +
       ".tm-store-debug-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}" +
@@ -942,7 +961,7 @@
           return;
         }
         RUNTIME.fastCmdApplied[appId] = false;
-        applyAuthorFastCmd(appId, author);
+        applyAuthorFastCmd(appId, author, { force: true });
         showToast("Author gesendet", "Befehl a " + author + " wurde gesendet.");
       });
     }
@@ -1011,52 +1030,100 @@
   }
 
   function renderBootFeedback() {
-    var root = ensureStoreRoot();
-    var host = root.getElementById("tm-store-feedback");
-    if (!host) {
-      host = document.createElement("div");
-      host.id = "tm-store-feedback";
-      host.className = "tm-store-feedback";
-      root.appendChild(host);
-    }
     var statuses = RUNTIME.status.slice(-8);
     var okCount = 0;
     var failCount = 0;
-    var list = statuses.map(function (s) {
+    var lastLine = "";
+    statuses.forEach(function (s) {
       if (s.ok) okCount += 1;
       else failCount += 1;
-      var icon = s.ok ? "✅" : "❌";
-      return "<li>" + icon + " " + s.appId + ": " + s.message + "</li>";
-    }).join("");
-    if (!list) {
-      list = "<li>Keine App geladen (alles deaktiviert oder nicht passend).</li>";
-    }
-    host.className = "tm-store-feedback " + (failCount > 0 ? "warn" : "ok");
-    host.innerHTML =
-      "<h4>Systemstatus • Geladen: " + okCount + " • Fehler: " + failCount + "</h4>" +
-      "<ul>" + list + "</ul>";
-    window.setTimeout(function () {
-      var current = root.getElementById("tm-store-feedback");
-      if (current) current.remove();
-    }, 4200);
+      lastLine = s.appId + ": " + s.message;
+    });
+    if (!lastLine) lastLine = "Keine App geladen (alles deaktiviert oder nicht passend).";
+    showToast(
+      "Systemstatus • Geladen: " + okCount + " • Fehler: " + failCount,
+      lastLine,
+      {
+        variant: failCount > 0 ? "warn" : "ok",
+        duration: 3600,
+        replaceKey: "system-status"
+      }
+    );
   }
 
-  function showToast(title, message) {
+  function ensureToaster() {
     var root = ensureStoreRoot();
-    var host = root.getElementById("tm-store-feedback");
+    var host = root.getElementById("tm-store-toaster");
     if (!host) {
       host = document.createElement("div");
-      host.id = "tm-store-feedback";
+      host.id = "tm-store-toaster";
+      host.className = "tm-store-toaster";
       root.appendChild(host);
     }
-    host.className = "tm-store-feedback ok";
-    host.innerHTML =
-      "<h4>" + escapeHtml(title || "Hinweis") + "</h4>" +
-      "<ul><li>" + escapeHtml(message || "") + "</li></ul>";
-    window.setTimeout(function () {
-      var current = root.getElementById("tm-store-feedback");
-      if (current) current.remove();
-    }, 2200);
+    return host;
+  }
+
+  function showToast(title, message, options) {
+    var opts = options || {};
+    var toaster = ensureToaster();
+    var variant = opts.variant || "ok";
+    var duration = typeof opts.duration === "number" ? opts.duration : 2200;
+    var replaceKey = opts.replaceKey ? String(opts.replaceKey) : "";
+    if (replaceKey) {
+      var existing = toaster.querySelector("[data-toast-key='" + replaceKey.replace(/'/g, "\\'") + "']");
+      if (existing) existing.remove();
+    }
+    var id = "tm-toast-" + (++RUNTIME.toastSeq);
+    var card = document.createElement("div");
+    card.className = "tm-store-toast " + variant;
+    card.id = id;
+    if (replaceKey) card.setAttribute("data-toast-key", replaceKey);
+
+    var head = document.createElement("div");
+    head.className = "tm-store-toast-head";
+    var ttl = document.createElement("div");
+    ttl.className = "tm-store-toast-title";
+    ttl.textContent = String(title || "Hinweis");
+    var closeBtn = document.createElement("button");
+    closeBtn.className = "tm-store-toast-close";
+    closeBtn.type = "button";
+    closeBtn.textContent = "x";
+    closeBtn.addEventListener("click", function () {
+      card.remove();
+    });
+    head.appendChild(ttl);
+    head.appendChild(closeBtn);
+    card.appendChild(head);
+
+    var desc = document.createElement("div");
+    desc.className = "tm-store-toast-desc";
+    desc.textContent = String(message || "");
+    card.appendChild(desc);
+
+    if (opts.actionLabel && typeof opts.onAction === "function") {
+      var actions = document.createElement("div");
+      actions.className = "tm-store-toast-actions";
+      var actionBtn = document.createElement("button");
+      actionBtn.className = "tm-store-toast-action-btn";
+      actionBtn.type = "button";
+      actionBtn.textContent = String(opts.actionLabel);
+      actionBtn.addEventListener("click", function () {
+        try { opts.onAction(); } catch (err) {}
+        card.remove();
+      });
+      actions.appendChild(actionBtn);
+      card.appendChild(actions);
+    }
+
+    toaster.appendChild(card);
+    while (toaster.children.length > 4) {
+      toaster.removeChild(toaster.firstElementChild);
+    }
+    if (duration > 0) {
+      window.setTimeout(function () {
+        if (card && card.parentNode) card.remove();
+      }, duration);
+    }
   }
 
   function loadAuthorCommandState() {
@@ -1069,14 +1136,15 @@
     GM_setValue(AUTHOR_CMD_STATE_KEY, JSON.stringify(state || {}));
   }
 
-  function applyAuthorFastCmd(appId, authorValue) {
+  function applyAuthorFastCmd(appId, authorValue, options) {
+    var opts = options || {};
     var author = String(authorValue || "").trim();
     if (!author) return;
-    if (RUNTIME.fastCmdApplied[appId]) return;
+    if (!opts.force && RUNTIME.fastCmdApplied[appId]) return;
     var persisted = loadAuthorCommandState();
     var persistedKey = String(appId || "") + "|" + author;
     var lastAt = Number(persisted[persistedKey] || 0);
-    if (lastAt && (now() - lastAt) < (10 * 60 * 1000)) {
+    if (!opts.force && lastAt && (now() - lastAt) < (10 * 60 * 1000)) {
       addLog("info", "author", "Author-Befehl übersprungen (Throttle aktiv)", { appId: appId, author: author });
       RUNTIME.fastCmdApplied[appId] = true;
       return;
