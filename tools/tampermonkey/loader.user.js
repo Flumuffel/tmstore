@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Klixa TM Store Loader
 // @namespace    klixa.tm.store
-// @version      0.4.23
+// @version      0.4.24
 // @author LWE
 // @description  Loads approved Intranet apps from GitHub Raw manifest
 // @match        https://intranet.klixa.ch/*
@@ -944,6 +944,9 @@
     var storeGrid = root.getElementById("tm-store-grid");
     var storeMeta = root.getElementById("tm-store-meta");
     var updateBannerWrap = root.getElementById("tm-store-update-banner-wrap");
+    var searchWrap = root.getElementById("tm-store-search-wrap");
+    var pagerWrap = root.getElementById("tm-store-pager");
+    var emptyWrap = root.getElementById("tm-store-empty");
     var debugWrap = root.getElementById("tm-store-debug");
     var debugRefresh = root.getElementById("tm-store-debug-refresh");
     var searchInput = root.getElementById("tm-store-search-input");
@@ -992,6 +995,9 @@
       if (storeGrid) storeGrid.classList.toggle("tm-store-hidden", hideMain);
       if (storeMeta) storeMeta.classList.toggle("tm-store-hidden", hideMain);
       if (updateBannerWrap) updateBannerWrap.classList.toggle("tm-store-hidden", hideMain);
+      if (searchWrap) searchWrap.classList.toggle("tm-store-hidden", hideMain);
+      if (pagerWrap) pagerWrap.classList.toggle("tm-store-hidden", hideMain);
+      if (emptyWrap) emptyWrap.classList.toggle("tm-store-hidden", hideMain);
     }
     if (fab) {
       fab.onclick = function () {
