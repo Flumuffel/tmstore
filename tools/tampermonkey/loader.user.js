@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Klixa TM Store Loader
 // @namespace    klixa.tm.store
-// @version      0.4.17
+// @version      0.4.18
 // @author LWE
 // @description  Loads approved Intranet apps from GitHub Raw manifest
 // @match        https://intranet.klixa.ch/*
@@ -654,7 +654,7 @@
       ".tm-store-debug-pre{font-family:Consolas,monospace;font-size:12px;white-space:pre-wrap;line-height:1.35;max-height:240px;overflow:auto;color:#cfe1ff;background:#0b1220;border:1px solid #334a73;border-radius:8px;padding:8px}" +
       ".tm-store-settings{margin-top:12px;border:1px solid #4f6591;border-radius:12px;padding:12px;background:rgba(8,14,29,.72)}" +
       ".tm-store-settings h4{margin:0 0 8px 0}" +
-      ".tm-store-settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}" +
+      ".tm-store-settings-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}" +
       ".tm-store-settings-grid{margin-top:12px}" +
       ".tm-store-field{display:flex;flex-direction:column;gap:6px}" +
       ".tm-store-field label{font-size:12px;color:#bdd1f5}" +
@@ -797,11 +797,11 @@
                 "<option value='43200000'>12 Stunden</option>" +
               "</select>" +
             "</div>" +
-            "<div class='tm-store-field'><label>Hinweis</label><input type='text' value='Update-Flow ist jetzt oben in der Update-Zentrale.' readonly></div>" +
             "<div class='tm-store-field'>" +
               "<label for='tm-store-update-periodic-toast'>Intervall-Mitteilungen anzeigen</label>" +
               "<input class='tm-store-toggle' id='tm-store-update-periodic-toast' type='checkbox' " + (settings.update && settings.update.notifyPeriodicToast ? "checked" : "") + ">" +
             "</div>" +
+            "<div class='tm-store-field'><label>Hinweis</label><input type='text' value='Update-Flow ist jetzt oben in der Update-Zentrale.' readonly></div>" +
           "</div>" +
           "<div class='tm-store-app-settings' id='tm-store-app-settings'></div>" +
         "</div>" +
