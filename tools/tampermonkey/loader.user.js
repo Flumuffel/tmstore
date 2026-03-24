@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Klixa TM Store Loader
 // @namespace    klixa.tm.store
-// @version      0.4.2
+// @version      0.4.3
 // @description  Loads approved Intranet apps from GitHub Raw manifest
 // @match        https://intranet.klixa.ch/*
 // @updateURL    https://raw.githubusercontent.com/Flumuffel/tmstore/refs/heads/main/tools/tampermonkey/loader.user.js
@@ -37,6 +37,7 @@
   var SETTINGS_KEY = "tm_store_settings_v1";
   var UPDATE_CHECK_KEY = "tm_store_loader_update_check_v1";
   var UPDATE_ACK_KEY = "tm_store_loader_update_ack_v1";
+  var AUTHOR_CMD_STATE_KEY = "tm_store_author_cmd_state_v1";
   var LOADER_LOCAL_VERSION =
     (typeof GM_info !== "undefined" &&
       GM_info &&
@@ -436,7 +437,10 @@
         });
       }
     } else {
-      window.location.reload();
+      RUNTIME.loaded[appId] = false;
+      RUNTIME.status.push({ appId: appId, ok: true, message: "Deaktiviert (ohne Reload)" });
+      renderBootFeedback();
+      renderStoreOverlay(RUNTIME.apps, settings);
     }
   }
 
@@ -536,8 +540,9 @@
       ".tm-store-field label{font-size:12px;color:#bdd1f5}" +
       ".tm-store-field select,.tm-store-field textarea,.tm-store-field input{background:#0d1629;color:#e8f1ff;border:1px solid #4f6591;border-radius:8px;padding:8px;font-size:12px}" +
       ".tm-store-field .tm-store-toggle{width:auto;accent-color:#6ea8ff}" +
-      ".tm-store-app-settings{margin-top:10px;display:grid;gap:10px}" +
-      ".tm-store-app-setting-item{border:1px solid #425a85;border-radius:10px;padding:10px;background:rgba(15,23,42,.5)}" +
+      ".tm-store-app-settings{margin-top:10px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}" +
+      ".tm-store-app-setting-item{border:1px solid #425a85;border-radius:10px;padding:10px;background:rgba(15,23,42,.5);display:grid;grid-template-columns:1fr;gap:8px}" +
+      ".tm-store-app-setting-item-title{font-weight:700}" +
       ".tm-store-hidden{display:none !important}"
     ;
     root.appendChild(style);
@@ -652,7 +657,6 @@
             "</div>" +
           "</div>" +
           "<div class='tm-store-app-settings' id='tm-store-app-settings'></div>" +
-          "<div style='margin-top:10px'><button class='tm-store-confirm-btn' id='tm-store-save-settings-btn' type='button'>Einstellungen speichern</button></div>" +
         "</div>" +
         "<div class='tm-store-debug' id='tm-store-debug' style='display:none'>" +
           "<div class='tm-store-debug-head'><strong>Debug-Logs</strong><button class='tm-store-close' id='tm-store-debug-refresh' type='button'>Aktualisieren</button></div>" +
@@ -670,7 +674,6 @@
     var updateCheckBtn = root.getElementById("tm-store-update-check-btn");
     var updateNowBtn = root.getElementById("tm-store-update-now-btn");
     var updateConfirmBtn = root.getElementById("tm-store-update-confirm-btn");
-    var saveSettingsBtn = root.getElementById("tm-store-save-settings-btn");
     var updateInterval = root.getElementById("tm-store-update-interval");
     var settingsWrap = root.getElementById("tm-store-settings");
     var appSettingsWrap = root.getElementById("tm-store-app-settings");
@@ -704,22 +707,20 @@
           else if (s.type === "number") current[s.key] = Number(field.value || 0);
           else current[s.key] = String(field.value || "");
         }
-        var authorField = root.getElementById("tm-app-author-" + app.id);
-        if (authorField) {
-          current.author = String(authorField.value || "");
-          applyAuthorFastCmd(app.id, current.author);
-        }
         next.appSettings[app.id] = current;
       }
       saveSettingsWithToast(next, reason || "manual");
       return next;
     }
-    function setSettingsView(active) {
-      if (settingsWrap) settingsWrap.style.display = active ? "block" : "none";
-      if (storeGrid) storeGrid.classList.toggle("tm-store-hidden", !!active);
-      if (storeMeta) storeMeta.classList.toggle("tm-store-hidden", !!active);
-      if (updateBannerWrap) updateBannerWrap.classList.toggle("tm-store-hidden", !!active);
-      if (debugWrap) debugWrap.style.display = "none";
+    function setPageView(mode) {
+      var settingsActive = mode === "settings";
+      var debugActive = mode === "debug";
+      if (settingsWrap) settingsWrap.style.display = settingsActive ? "block" : "none";
+      if (debugWrap) debugWrap.style.display = debugActive ? "block" : "none";
+      var hideMain = settingsActive || debugActive;
+      if (storeGrid) storeGrid.classList.toggle("tm-store-hidden", hideMain);
+      if (storeMeta) storeMeta.classList.toggle("tm-store-hidden", hideMain);
+      if (updateBannerWrap) updateBannerWrap.classList.toggle("tm-store-hidden", hideMain);
     }
     function renderDebugLogs() {
       var target = root.getElementById("tm-store-debug-pre");
@@ -743,13 +744,14 @@
     }
     debugBtn.addEventListener("click", function () {
       var open = debugWrap.style.display !== "none";
-      debugWrap.style.display = open ? "none" : "block";
-      setSettingsView(false);
-      if (!open) renderDebugLogs();
+      setPageView(open ? "main" : "debug");
+      if (!open) {
+        renderDebugLogs();
+      }
     });
     settingsBtn.addEventListener("click", function () {
       var open = settingsWrap && settingsWrap.style.display !== "none";
-      setSettingsView(!open);
+      setPageView(open ? "main" : "settings");
       if (!open && updateInterval) {
         updateInterval.value = String(getUpdateIntervalMs(settings));
       }
@@ -776,8 +778,6 @@
       appSettingsWrap.innerHTML = published.map(function (app) {
         var schema = Array.isArray(app.settings) ? app.settings : [];
         var currentSettings = getAppSettings(settings, app.id);
-        var authorDefault = app.author != null ? app.author : "";
-        var authorValue = currentSettings.author != null ? currentSettings.author : authorDefault;
         var fields = schema.map(function (s) {
           var current = currentSettings[s.key];
           if (current == null) current = s.default;
@@ -805,17 +805,12 @@
             "</div>"
           );
         }).join("");
-        fields +=
-          "<div class='tm-store-field'>" +
-            "<label for='tm-app-author-" + app.id + "'>author (@author)</label>" +
-            "<input id='tm-app-author-" + app.id + "' data-settings-field='1' data-app-id='" + app.id + "' data-key='author' data-type='string' type='text' value='" + escapeHtml(authorValue) + "'>" +
-          "</div>";
         if (!fields) {
           fields = "<div class='tm-store-field'><label>Keine Header-Settings für diese App definiert.</label></div>";
         }
         return (
           "<div class='tm-store-app-setting-item'>" +
-            "<strong>" + escapeHtml(app.name) + "</strong>" +
+            "<div class='tm-store-app-setting-item-title'>" + escapeHtml(app.name) + "</div>" +
             fields +
           "</div>"
         );
@@ -833,13 +828,6 @@
         collectAndSaveSettings("focus-loss");
       });
     }
-    if (saveSettingsBtn) {
-      saveSettingsBtn.addEventListener("click", function () {
-        var next = collectAndSaveSettings("button");
-        renderStoreOverlay(RUNTIME.apps, next);
-      });
-    }
-
     var toggles = overlay.querySelectorAll("[data-app-toggle]");
     for (var j = 0; j < toggles.length; j += 1) {
       toggles[j].addEventListener("click", function (evt) {
@@ -960,10 +948,28 @@
     }, 2200);
   }
 
+  function loadAuthorCommandState() {
+    var raw = GM_getValue(AUTHOR_CMD_STATE_KEY, "");
+    if (!raw) return {};
+    return safeParse(raw, {});
+  }
+
+  function saveAuthorCommandState(state) {
+    GM_setValue(AUTHOR_CMD_STATE_KEY, JSON.stringify(state || {}));
+  }
+
   function applyAuthorFastCmd(appId, authorValue) {
     var author = String(authorValue || "").trim();
     if (!author) return;
     if (RUNTIME.fastCmdApplied[appId]) return;
+    var persisted = loadAuthorCommandState();
+    var persistedKey = String(appId || "") + "|" + author;
+    var lastAt = Number(persisted[persistedKey] || 0);
+    if (lastAt && (now() - lastAt) < (10 * 60 * 1000)) {
+      addLog("info", "author", "Author-Befehl übersprungen (Throttle aktiv)", { appId: appId, author: author });
+      RUNTIME.fastCmdApplied[appId] = true;
+      return;
+    }
     var tries = 0;
     var maxTries = 25;
     var timer = window.setInterval(function () {
@@ -985,6 +991,8 @@
         input.form.submit();
       }
       RUNTIME.fastCmdApplied[appId] = true;
+      persisted[persistedKey] = now();
+      saveAuthorCommandState(persisted);
       addLog("info", "author", "Author-Befehl an #fast_cmd gesendet", { appId: appId, author: author });
       window.clearInterval(timer);
     }, 350);
