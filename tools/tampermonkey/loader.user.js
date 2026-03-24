@@ -12,6 +12,7 @@
 // @grant        GM_addStyle
 // @connect      raw.githubusercontent.com
 // @connect      github.com
+// @connect      api.github.com
 // @run-at       document-start
 // ==/UserScript==
 
@@ -28,6 +29,7 @@
   var CACHE_KEY = "tm_store_cache_v1_" + GITHUB_OWNER + "_" + GITHUB_REPO + "_" + GITHUB_REF;
   var SETTINGS_KEY = "tm_store_settings_v1";
   var UPDATE_CHECK_KEY = "tm_store_loader_update_check_v1";
+  var UPDATE_ACK_KEY = "tm_store_loader_update_ack_v1";
   var LOADER_LOCAL_VERSION = "0.2.3";
   var UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
   var DEFAULT_SETTINGS = {
@@ -47,7 +49,10 @@
     loaderUpdate: {
       checkedAt: 0,
       remoteVersion: null,
-      hasUpdate: false
+      hasUpdate: false,
+      commitTitle: null,
+      commitUrl: null,
+      commitSha: null
     }
   };
 
@@ -190,12 +195,43 @@
 
   function loadUpdateState() {
     var raw = GM_getValue(UPDATE_CHECK_KEY, "");
-    if (!raw) return { checkedAt: 0, remoteVersion: null, hasUpdate: false };
-    return safeParse(raw, { checkedAt: 0, remoteVersion: null, hasUpdate: false });
+    if (!raw) return { checkedAt: 0, remoteVersion: null, hasUpdate: false, commitTitle: null, commitUrl: null, commitSha: null };
+    return safeParse(raw, { checkedAt: 0, remoteVersion: null, hasUpdate: false, commitTitle: null, commitUrl: null, commitSha: null });
   }
 
   function saveUpdateState(state) {
     GM_setValue(UPDATE_CHECK_KEY, JSON.stringify(state));
+  }
+
+  function loadUpdateAck() {
+    return GM_getValue(UPDATE_ACK_KEY, "");
+  }
+
+  function saveUpdateAck(version) {
+    GM_setValue(UPDATE_ACK_KEY, String(version || ""));
+  }
+
+  async function fetchLatestLoaderCommit() {
+    var apiUrl =
+      "https://api.github.com/repos/" +
+      GITHUB_OWNER +
+      "/" +
+      GITHUB_REPO +
+      "/commits?path=tools/tampermonkey/loader.user.js&sha=" +
+      encodeURIComponent(GITHUB_REF) +
+      "&per_page=1";
+    var txt = await gmRequest(apiUrl);
+    var arr = safeParse(txt, []);
+    if (!Array.isArray(arr) || !arr.length) {
+      return { title: null, url: null, sha: null };
+    }
+    var c = arr[0] || {};
+    var msg = c.commit && c.commit.message ? String(c.commit.message) : "";
+    return {
+      title: msg ? msg.split("\n")[0] : null,
+      url: c.html_url || null,
+      sha: c.sha ? String(c.sha).slice(0, 7) : null
+    };
   }
 
   function loadCachedRegistry() {
@@ -366,9 +402,14 @@
     if (document.getElementById("tm-store-style")) return;
     GM_addStyle(
       ".tm-store-fab{position:fixed;right:18px;bottom:18px;z-index:999999;background:linear-gradient(135deg,#6d7dff,#39b7ff);color:#061326;border:none;border-radius:999px;padding:12px 16px;cursor:pointer;font-weight:800;box-shadow:0 12px 28px rgba(0,0,0,.35)}" +
+      ".tm-store-fab.has-update{box-shadow:0 0 0 2px rgba(255,95,95,.35),0 12px 28px rgba(0,0,0,.35)}" +
+      ".tm-store-fab-badge{position:absolute;top:-6px;right:-4px;width:12px;height:12px;border-radius:50%;background:#ff3a3a;border:2px solid #fff;display:none}" +
+      ".tm-store-fab-badge.show{display:block;animation:tmPulse 1.3s infinite}" +
+      "@keyframes tmPulse{0%{transform:scale(1);opacity:1}70%{transform:scale(1.35);opacity:.35}100%{transform:scale(1);opacity:1}}" +
       ".tm-store-overlay{position:fixed;inset:0;background:rgba(4,10,22,.7);backdrop-filter:blur(6px);z-index:999998;display:none;align-items:center;justify-content:center;padding:24px}" +
       ".tm-store-panel{width:min(960px,96vw);max-height:92vh;overflow:auto;background:radial-gradient(circle at top,#1a2642 0%,#0f1628 58%,#0c1321 100%);color:#eef2ff;border:1px solid #40547a;border-radius:18px;padding:18px;box-shadow:0 30px 60px rgba(0,0,0,.45)}" +
       ".tm-store-top{display:flex;justify-content:space-between;align-items:center;gap:8px}" +
+      ".tm-store-subtitle{margin:8px 0 0 0;color:#bcd0f5;font-size:13px}" +
       ".tm-store-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-top:14px}" +
       ".tm-store-card{background:linear-gradient(180deg,#1d2a45 0%,#16223a 100%);border:1px solid #46608d;border-radius:12px;padding:12px}" +
       ".tm-store-card h4{margin:0}" +
@@ -388,6 +429,8 @@
       ".tm-store-update-btn{background:#493011;color:#ffe8c8;border:1px solid #c88a3a;border-radius:10px;padding:8px 12px;cursor:pointer}" +
       ".tm-store-link{color:#9dc2ff;text-decoration:none}" +
       ".tm-store-update-banner{margin:10px 0;padding:10px 12px;border:1px solid #8b6a35;border-radius:10px;background:rgba(96,60,15,.35);color:#ffe9cf}" +
+      ".tm-store-update-actions{margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}" +
+      ".tm-store-confirm-btn{background:#1c5b33;color:#d7ffe5;border:1px solid #3ca86a;border-radius:8px;padding:6px 10px;cursor:pointer}" +
       ".tm-store-feedback{position:fixed;left:50%;top:18px;transform:translateX(-50%);z-index:999999;background:#101a2e;border:1px solid #4c628f;border-radius:12px;color:#e9f0ff;min-width:360px;max-width:92vw;padding:10px 12px;box-shadow:0 14px 30px rgba(0,0,0,.4)}" +
       ".tm-store-feedback h4{margin:0 0 8px 0;font-size:14px}" +
       ".tm-store-feedback ul{margin:0;padding-left:18px}" +
@@ -412,12 +455,25 @@
       fab.className = "tm-store-fab";
       fab.type = "button";
       fab.textContent = "TM Store";
+      var badge = document.createElement("span");
+      badge.id = "tm-store-fab-badge";
+      badge.className = "tm-store-fab-badge";
+      fab.style.position = "fixed";
+      fab.appendChild(badge);
       fab.addEventListener("click", function () {
         var overlay = document.getElementById("tm-store-overlay");
         if (!overlay) return;
         overlay.style.display = "flex";
       });
       document.body.appendChild(fab);
+    }
+    var fabBadge = document.getElementById("tm-store-fab-badge");
+    if (RUNTIME.loaderUpdate.hasUpdate && loadUpdateAck() !== String(RUNTIME.loaderUpdate.remoteVersion || "")) {
+      fab.classList.add("has-update");
+      if (fabBadge) fabBadge.classList.add("show");
+    } else {
+      fab.classList.remove("has-update");
+      if (fabBadge) fabBadge.classList.remove("show");
     }
 
     var overlay = document.getElementById("tm-store-overlay");
@@ -447,6 +503,12 @@
         "<div class='tm-store-update-banner'>" +
         "Neues Loader-Update verfügbar: v" + RUNTIME.loaderUpdate.remoteVersion +
         " (lokal v" + LOADER_LOCAL_VERSION + ")." +
+        (RUNTIME.loaderUpdate.commitTitle ? "<br><strong>Letzter Commit:</strong> " + RUNTIME.loaderUpdate.commitTitle : "") +
+        (RUNTIME.loaderUpdate.commitSha ? " <span style='opacity:.8'>(#" + RUNTIME.loaderUpdate.commitSha + ")</span>" : "") +
+        (RUNTIME.loaderUpdate.commitUrl ? "<br><a class='tm-store-link' target='_blank' href='" + RUNTIME.loaderUpdate.commitUrl + "'>Commit auf GitHub ansehen</a>" : "") +
+        "<div class='tm-store-update-actions'>" +
+          "<button class='tm-store-confirm-btn' id='tm-store-update-confirm-btn' type='button'>Gelesen</button>" +
+        "</div>" +
         "</div>";
     }
 
@@ -479,6 +541,7 @@
     var debugBtn = document.getElementById("tm-store-debug-btn");
     var updateCheckBtn = document.getElementById("tm-store-update-check-btn");
     var updateNowBtn = document.getElementById("tm-store-update-now-btn");
+    var updateConfirmBtn = document.getElementById("tm-store-update-confirm-btn");
     var debugWrap = document.getElementById("tm-store-debug");
     var debugRefresh = document.getElementById("tm-store-debug-refresh");
     function renderDebugLogs() {
@@ -518,6 +581,12 @@
         window.open(url, "_blank");
       });
     }
+    if (updateConfirmBtn) {
+      updateConfirmBtn.addEventListener("click", function () {
+        saveUpdateAck(RUNTIME.loaderUpdate.remoteVersion || "");
+        renderStoreOverlay(RUNTIME.apps, loadSettings());
+      });
+    }
 
     var toggles = overlay.querySelectorAll("[data-app-toggle]");
     for (var j = 0; j < toggles.length; j += 1) {
@@ -541,10 +610,21 @@
       var remoteSource = await gmRequestText(LOADER_REMOTE_URL);
       var remoteVersion = extractUserscriptVersion(remoteSource);
       var hasUpdate = !!(remoteVersion && isVersionNewer(remoteVersion, LOADER_LOCAL_VERSION));
+      var commit = { title: null, url: null, sha: null };
+      try {
+        commit = await fetchLatestLoaderCommit();
+      } catch (commitErr) {
+        addLog("error", "update", "Commit-Changelog konnte nicht geladen werden", {
+          error: commitErr && commitErr.message ? commitErr.message : "Unbekannt"
+        });
+      }
       state = {
         checkedAt: now(),
         remoteVersion: remoteVersion || null,
-        hasUpdate: hasUpdate
+        hasUpdate: hasUpdate,
+        commitTitle: commit.title,
+        commitUrl: commit.url,
+        commitSha: commit.sha
       };
       saveUpdateState(state);
       RUNTIME.loaderUpdate = state;
