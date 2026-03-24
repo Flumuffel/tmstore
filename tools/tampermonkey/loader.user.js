@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Klixa TM Store Loader
 // @namespace    klixa.tm.store
-// @version      0.4.8
+// @version      0.4.9
 // @author LWE
 // @description  Loads approved Intranet apps from GitHub Raw manifest
 // @match        https://intranet.klixa.ch/*
@@ -329,6 +329,16 @@
     GM_setValue(UPDATE_ACK_KEY, String(version || ""));
   }
 
+  function normalizeUpdateStateWithLocalVersion(state) {
+    var next = state || loadUpdateState();
+    if (next && next.hasUpdate && next.remoteVersion && !isVersionNewer(next.remoteVersion, LOADER_LOCAL_VERSION)) {
+      next.hasUpdate = false;
+      next.remoteVersion = LOADER_LOCAL_VERSION;
+      saveUpdateState(next);
+    }
+    return next;
+  }
+
   async function fetchLatestLoaderCommit() {
     var apiUrl =
       "https://api.github.com/repos/" +
@@ -651,7 +661,7 @@
       root.appendChild(fab);
     }
     var fabBadge = root.getElementById("tm-store-fab-badge");
-    if (RUNTIME.loaderUpdate.hasUpdate && loadUpdateAck() !== String(RUNTIME.loaderUpdate.remoteVersion || "")) {
+    if (RUNTIME.loaderUpdate.hasUpdate) {
       fab.classList.add("has-update");
       if (fabBadge) fabBadge.classList.add("show");
     } else {
@@ -1029,27 +1039,7 @@
     }
   }
 
-  function renderBootFeedback() {
-    var statuses = RUNTIME.status.slice(-8);
-    var okCount = 0;
-    var failCount = 0;
-    var lastLine = "";
-    statuses.forEach(function (s) {
-      if (s.ok) okCount += 1;
-      else failCount += 1;
-      lastLine = s.appId + ": " + s.message;
-    });
-    if (!lastLine) lastLine = "Keine App geladen (alles deaktiviert oder nicht passend).";
-    showToast(
-      "Systemstatus • Geladen: " + okCount + " • Fehler: " + failCount,
-      lastLine,
-      {
-        variant: failCount > 0 ? "warn" : "ok",
-        duration: 3600,
-        replaceKey: "system-status"
-      }
-    );
-  }
+  function renderBootFeedback() {}
 
   function ensureToaster() {
     var root = ensureStoreRoot();
@@ -1178,7 +1168,7 @@
   }
 
   async function boot() {
-    RUNTIME.loaderUpdate = loadUpdateState();
+    RUNTIME.loaderUpdate = normalizeUpdateStateWithLocalVersion(loadUpdateState());
     checkLoaderUpdate(false).then(function () {
       if (document.body) {
         renderStoreOverlay(RUNTIME.apps, loadSettings());
