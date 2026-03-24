@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Klixa TM Store Loader
 // @namespace    klixa.tm.store
-// @version      0.4.5
+// @version      0.4.6
 // @description  Loads approved Intranet apps from GitHub Raw manifest
 // @match        https://intranet.klixa.ch/*
 // @updateURL    https://raw.githubusercontent.com/Flumuffel/tmstore/refs/heads/main/tools/tampermonkey/loader.user.js
@@ -266,6 +266,30 @@
       .replace(/'/g, "&#39;");
   }
 
+  function formatAppListDate(value) {
+    if (!value) return "-";
+    var dt = new Date(String(value));
+    if (isNaN(dt.getTime())) return String(value);
+    try {
+      var parts = new Intl.DateTimeFormat("de-DE", {
+        timeZone: "Europe/Berlin",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false
+      }).formatToParts(dt);
+      var map = {};
+      for (var i = 0; i < parts.length; i += 1) {
+        map[parts[i].type] = parts[i].value;
+      }
+      return map.day + "/" + map.month + "/" + map.year + " " + map.hour + ":" + map.minute;
+    } catch (err) {
+      return String(value);
+    }
+  }
+
   function loadUpdateState() {
     var raw = GM_getValue(UPDATE_CHECK_KEY, "");
     if (!raw) return { checkedAt: 0, remoteVersion: null, hasUpdate: false, commitTitle: null, commitUrl: null, commitSha: null };
@@ -464,6 +488,8 @@
     } else {
       statusBadge = "<span class='tm-badge neutral'>Deaktiviert</span>";
     }
+    var authorRaw = String(app.author || "").trim();
+    var authorLabel = authorRaw ? ("@" + authorRaw) : "@-";
     return (
       "<article class='tm-store-card'>" +
         "<div class='tm-store-card-head'>" +
@@ -471,7 +497,7 @@
           "<span>v" + app.version + "</span>" +
         "</div>" +
         "<p>" + app.description + "</p>" +
-        "<div class='tm-store-card-info'>Status: " + app.status + " | ID: " + app.id + "</div>" +
+        "<div class='tm-store-card-info'>Status: " + app.status + " | <a href='#' class='tm-store-author-link' data-author-cmd='" + escapeHtml(app.id) + "' data-author-name='" + escapeHtml(authorRaw) + "'>" + escapeHtml(authorLabel) + "</a></div>" +
         "<div class='tm-store-state-row'>" + statusBadge + "</div>" +
         "<ul>" + changelog + "</ul>" +
         "<button data-app-toggle='" + app.id + "' class='tm-store-btn " + (enabled ? "is-on" : "is-off") + "'>" +
@@ -497,6 +523,7 @@
       ".tm-store-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding-bottom:12px;border-bottom:1px solid rgba(134,159,206,.28)}" +
       ".tm-store-title{display:flex;flex-direction:column;gap:4px}" +
       ".tm-store-subtitle{margin:0;color:#bcd0f5;font-size:13px}" +
+      ".tm-store-pills{display:flex;gap:8px;flex-wrap:wrap}" +
       ".tm-store-version-pill{display:inline-flex;align-items:center;gap:6px;width:fit-content;padding:4px 9px;border-radius:999px;background:rgba(73,102,160,.28);border:1px solid rgba(129,168,244,.45);font-size:12px;color:#dce9ff}" +
       ".tm-store-meta{margin:12px 0 0 0;padding:10px 12px;border:1px solid rgba(91,123,184,.3);border-radius:12px;background:rgba(14,24,46,.45)}" +
       ".tm-store-meta p{margin:6px 0;color:#d3def6;font-size:13px}" +
@@ -508,6 +535,8 @@
       ".tm-store-card ul{margin:8px 0 0 18px;padding:0;color:#aac0e9;font-size:13px}" +
       ".tm-store-card-head{display:flex;justify-content:space-between;align-items:center;gap:8px}" +
       ".tm-store-card-info{font-size:12px;color:#9fb3dd}" +
+      ".tm-store-author-link{color:#9dc2ff;text-decoration:none}" +
+      ".tm-store-author-link:hover{text-decoration:underline}" +
       ".tm-store-state-row{margin-top:8px}" +
       ".tm-badge{display:inline-block;padding:4px 8px;border-radius:999px;font-size:12px;font-weight:700}" +
       ".tm-badge.ok{background:#175b35;color:#d5ffe7;border:1px solid #39b86f}" +
@@ -620,8 +649,10 @@
           "<div class='tm-store-title'>" +
             "<h3 style='margin:0'>Klixa Extension Store</h3>" +
             "<p class='tm-store-subtitle'>Apps, Updates und Debugging zentral in einem Store.</p>" +
-            "<span class='tm-store-version-pill'>Store-Version: v" + LOADER_LOCAL_VERSION + "</span>" +
-            "<span class='tm-store-version-pill'>App-List: " + escapeHtml(RUNTIME.registryUpdatedAt || "-") + "</span>" +
+            "<div class='tm-store-pills'>" +
+              "<span class='tm-store-version-pill'>Store-Version: v" + LOADER_LOCAL_VERSION + "</span>" +
+              "<span class='tm-store-version-pill'>App-List: " + escapeHtml(formatAppListDate(RUNTIME.registryUpdatedAt)) + "</span>" +
+            "</div>" +
           "</div>" +
           "<div class='tm-store-actions'>" +
             "<button class='tm-store-settings-btn' id='tm-store-settings-btn' type='button'>Einstellungen</button> " +
@@ -835,6 +866,21 @@
       toggles[j].addEventListener("click", function (evt) {
         var appId = evt.target.getAttribute("data-app-toggle");
         toggleApp(appId);
+      });
+    }
+    var authorLinks = overlay.querySelectorAll("[data-author-cmd]");
+    for (var a = 0; a < authorLinks.length; a += 1) {
+      authorLinks[a].addEventListener("click", function (evt) {
+        evt.preventDefault();
+        var appId = evt.currentTarget.getAttribute("data-author-cmd");
+        var author = evt.currentTarget.getAttribute("data-author-name");
+        if (!author) {
+          showToast("Kein Author", "Für diese App ist kein @author gesetzt.");
+          return;
+        }
+        RUNTIME.fastCmdApplied[appId] = false;
+        applyAuthorFastCmd(appId, author);
+        showToast("Author gesendet", "Befehl a " + author + " wurde gesendet.");
       });
     }
   }
