@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Klixa TM Store Loader
 // @namespace    klixa.tm.store
-// @version      0.4.9
+// @version      0.4.10
 // @author LWE
 // @description  Loads approved Intranet apps from GitHub Raw manifest
 // @match        https://intranet.klixa.ch/*
@@ -68,6 +68,7 @@
     loadedCss: {},
     fastCmdApplied: {},
     toastSeq: 0,
+    updateTimerId: null,
     loaderUpdate: {
       checkedAt: 0,
       remoteVersion: null,
@@ -541,7 +542,7 @@
           "<span>v" + app.version + "</span>" +
         "</div>" +
         "<p>" + app.description + "</p>" +
-        "<div class='tm-store-card-info'>Status: " + app.status + " | <a href='#' class='tm-store-author-link' data-author-cmd='" + escapeHtml(app.id) + "' data-author-name='" + escapeHtml(authorRaw) + "'>" + escapeHtml(authorLabel) + "</a></div>" +
+        "<div class='tm-store-card-info'><a href='#' class='tm-store-author-link' data-author-cmd='" + escapeHtml(app.id) + "' data-author-name='" + escapeHtml(authorRaw) + "'>" + escapeHtml(authorLabel) + "</a></div>" +
         "<div class='tm-store-state-row'>" + statusBadge + "</div>" +
         "<ul>" + changelog + "</ul>" +
         "<button data-app-toggle='" + app.id + "' class='tm-store-btn " + (enabled ? "is-on" : "is-off") + "'>" +
@@ -626,11 +627,12 @@
       ".tm-store-settings{margin-top:12px;border:1px solid #4f6591;border-radius:12px;padding:12px;background:rgba(8,14,29,.72)}" +
       ".tm-store-settings h4{margin:0 0 8px 0}" +
       ".tm-store-settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}" +
+      ".tm-store-settings-grid{margin-top:12px}" +
       ".tm-store-field{display:flex;flex-direction:column;gap:6px}" +
       ".tm-store-field label{font-size:12px;color:#bdd1f5}" +
       ".tm-store-field select,.tm-store-field textarea,.tm-store-field input{background:#0d1629;color:#e8f1ff;border:1px solid #4f6591;border-radius:8px;padding:8px;font-size:12px}" +
       ".tm-store-field .tm-store-toggle{width:auto;accent-color:#6ea8ff}" +
-      ".tm-store-app-settings{margin-top:10px;display:grid;gap:10px}" +
+      ".tm-store-app-settings{margin-top:14px;display:grid;gap:10px}" +
       ".tm-store-app-setting-item{border:1px solid #425a85;border-radius:10px;padding:10px;background:rgba(15,23,42,.5);display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}" +
       ".tm-store-app-setting-item-title{font-weight:700;grid-column:1 / -1}" +
       ".tm-store-hidden{display:none !important}"
@@ -797,6 +799,7 @@
     var debugRefresh = root.getElementById("tm-store-debug-refresh");
     function saveSettingsWithToast(next, reason) {
       saveSettings(next);
+      startPeriodicUpdateChecks();
       addLog("info", "settings", "Einstellungen gespeichert", {
         reason: reason || "manual",
         intervalMs: next.update && next.update.intervalMs
@@ -1039,6 +1042,30 @@
     }
   }
 
+  function startPeriodicUpdateChecks() {
+    if (RUNTIME.updateTimerId) {
+      window.clearTimeout(RUNTIME.updateTimerId);
+      RUNTIME.updateTimerId = null;
+    }
+    function scheduleNextTick() {
+      var settings = loadSettings();
+      var delay = getUpdateIntervalMs(settings);
+      RUNTIME.updateTimerId = window.setTimeout(function () {
+        checkLoaderUpdate(false).then(function () {
+          if (document.body && RUNTIME.apps && RUNTIME.apps.length) {
+            renderStoreOverlay(RUNTIME.apps, loadSettings());
+          }
+        }).finally(function () {
+          scheduleNextTick();
+        });
+      }, delay);
+    }
+    addLog("info", "update", "Periodischer Update-Check gestartet", {
+      intervalMs: getUpdateIntervalMs(loadSettings())
+    });
+    scheduleNextTick();
+  }
+
   function renderBootFeedback() {}
 
   function ensureToaster() {
@@ -1169,6 +1196,7 @@
 
   async function boot() {
     RUNTIME.loaderUpdate = normalizeUpdateStateWithLocalVersion(loadUpdateState());
+    startPeriodicUpdateChecks();
     checkLoaderUpdate(false).then(function () {
       if (document.body) {
         renderStoreOverlay(RUNTIME.apps, loadSettings());
