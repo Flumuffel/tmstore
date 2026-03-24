@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Klixa TM Store Loader
 // @namespace    klixa.tm.store
-// @version      0.2.1
+// @version      0.2.2
 // @description  Loads approved Intranet apps from GitHub Raw manifest
 // @match        https://intranet.klixa.ch/*
 // @updateURL    https://raw.githubusercontent.com/Flumuffel/tmstore/refs/heads/main/tools/tampermonkey/loader.user.js
@@ -38,7 +38,8 @@
     apps: [],
     loaded: {},
     status: [],
-    logs: []
+    logs: [],
+    loadedCss: {}
   };
 
   function addLog(level, scope, message, data) {
@@ -188,6 +189,25 @@
   }
 
   async function runApp(app) {
+    if (app.cssUrl) {
+      if (!RUNTIME.loadedCss[app.id]) {
+        try {
+          addLog("info", "app:" + app.id, "Lade App-CSS", { url: app.cssUrl });
+          var cssText = await gmRequestText(app.cssUrl);
+          GM_addStyle(cssText);
+          RUNTIME.loadedCss[app.id] = true;
+          addLog("info", "app:" + app.id, "App-CSS injiziert", { bytes: cssText.length });
+        } catch (cssErr) {
+          addLog("error", "app:" + app.id, "App-CSS konnte nicht geladen werden", {
+            url: app.cssUrl,
+            error: cssErr && cssErr.message ? cssErr.message : "Unbekannt"
+          });
+        }
+      } else {
+        addLog("info", "app:" + app.id, "App-CSS bereits injiziert");
+      }
+    }
+
     addLog("info", "app:" + app.id, "Lade App-Bundle", { url: app.bundleUrl, version: app.version });
     var code = await gmRequestText(app.bundleUrl);
     if (app.sha256) {
@@ -209,7 +229,8 @@
       appId: app.id,
       appVersion: app.version,
       settingsKey: SETTINGS_KEY,
-      repository: REPO_URL
+      repository: REPO_URL,
+      cssInjectedByLoader: !!RUNTIME.loadedCss[app.id]
     };
     var wrapped = "(function(window, document){\n" + code + "\n})(window, document);";
     try {
