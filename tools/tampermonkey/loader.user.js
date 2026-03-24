@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Klixa TM Store Loader
 // @namespace    klixa.tm.store
-// @version      0.4.6
+// @version      0.4.7
 // @author LWE
 // @description  Loads approved Intranet apps from GitHub Raw manifest
 // @match        https://intranet.klixa.ch/*
@@ -291,6 +291,25 @@
     }
   }
 
+  function formatDateTimeBerlin(value) {
+    if (!value) return "-";
+    var dt = new Date(Number(value) || String(value));
+    if (isNaN(dt.getTime())) return "-";
+    try {
+      return new Intl.DateTimeFormat("de-DE", {
+        timeZone: "Europe/Berlin",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false
+      }).format(dt);
+    } catch (err) {
+      return "-";
+    }
+  }
+
   function loadUpdateState() {
     var raw = GM_getValue(UPDATE_CHECK_KEY, "");
     if (!raw) return { checkedAt: 0, remoteVersion: null, hasUpdate: false, commitTitle: null, commitUrl: null, commitSha: null };
@@ -553,6 +572,17 @@
       ".tm-store-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}" +
       ".tm-store-update-banner{margin:12px 0;padding:10px 12px;border:1px solid #8b6a35;border-radius:12px;background:linear-gradient(135deg,rgba(96,60,15,.45),rgba(58,43,24,.35));color:#ffe9cf}" +
       ".tm-store-update-actions{margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}" +
+      ".tm-store-update-hub{margin-top:12px;padding:12px;border:1px solid #5e6f97;border-radius:14px;background:linear-gradient(155deg,rgba(20,32,58,.82),rgba(9,17,35,.82));box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}" +
+      ".tm-store-update-hub-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}" +
+      ".tm-store-update-hub-title{font-weight:800;font-size:15px;letter-spacing:.2px}" +
+      ".tm-store-update-chip{display:inline-flex;align-items:center;padding:4px 9px;border-radius:999px;font-size:12px;font-weight:700;border:1px solid #5878b0;background:#243653;color:#dbe8ff}" +
+      ".tm-store-update-chip.ok{background:#173f2d;border-color:#39b86f;color:#d5ffe7}" +
+      ".tm-store-update-chip.warn{background:#5b3f13;border-color:#d59a42;color:#ffe8c8}" +
+      ".tm-store-update-chip.neutral{background:#243653;border-color:#5878b0;color:#dbe8ff}" +
+      ".tm-store-update-hub-grid{margin-top:10px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}" +
+      ".tm-store-update-kv{font-size:12px;color:#cbd9f7;background:rgba(18,28,51,.6);border:1px solid rgba(98,121,168,.45);border-radius:10px;padding:8px}" +
+      ".tm-store-update-kv strong{color:#eef3ff}" +
+      ".tm-store-update-hub-actions{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap}" +
       ".tm-store-confirm-btn{background:#1c5b33;color:#d7ffe5;border:1px solid #3ca86a;border-radius:8px;padding:6px 10px;cursor:pointer}" +
       ".tm-store-feedback{position:fixed;right:20px;bottom:78px;z-index:999999;background:linear-gradient(135deg,rgba(12,20,36,.96),rgba(16,31,58,.94));border:1px solid #4f6fa5;border-radius:14px;color:#eaf2ff;min-width:300px;max-width:420px;padding:10px 12px;box-shadow:0 18px 40px rgba(0,0,0,.45);backdrop-filter:blur(6px);animation:tmToastIn .22s ease-out}" +
       ".tm-store-feedback h4{margin:0 0 6px 0;font-size:13px}" +
@@ -635,14 +665,16 @@
     if (RUNTIME.loaderUpdate.hasUpdate) {
       updateBanner =
         "<div class='tm-store-update-banner'>" +
-        "Neues Loader-Update verfügbar: v" + RUNTIME.loaderUpdate.remoteVersion +
-        " (lokal v" + LOADER_LOCAL_VERSION + ")." +
-        (RUNTIME.loaderUpdate.commitTitle ? "<br><strong>Letzter Commit:</strong> " + RUNTIME.loaderUpdate.commitTitle : "") +
-        (RUNTIME.loaderUpdate.commitSha ? " <span style='opacity:.8'>(#" + RUNTIME.loaderUpdate.commitSha + ")</span>" : "") +
-        (RUNTIME.loaderUpdate.commitUrl ? "<br><a class='tm-store-link' target='_blank' href='" + RUNTIME.loaderUpdate.commitUrl + "'>Commit auf GitHub ansehen</a>" : "") +
-        "<br>Update-Flow findest du unter <strong>Einstellungen</strong>." +
+        "Neues Loader-Update verfügbar. Öffne <strong>Einstellungen</strong> für den neuen Update-Flow." +
         "</div>";
     }
+    var updateAcked = loadUpdateAck() === String(RUNTIME.loaderUpdate.remoteVersion || "");
+    var updateHas = !!RUNTIME.loaderUpdate.hasUpdate;
+    var updateChipClass = updateHas ? (updateAcked ? "neutral" : "warn") : "ok";
+    var updateChipText = updateHas ? (updateAcked ? "Update bestätigt" : "Update verfügbar") : "Aktuell";
+    var checkedAtText = formatDateTimeBerlin(RUNTIME.loaderUpdate.checkedAt);
+    var nextCheckTs = RUNTIME.loaderUpdate.checkedAt ? (Number(RUNTIME.loaderUpdate.checkedAt) + Number(getUpdateIntervalMs(settings))) : 0;
+    var nextCheckText = nextCheckTs ? formatDateTimeBerlin(nextCheckTs) : "sofort";
 
     overlay.innerHTML =
       "<div class='tm-store-panel'>" +
@@ -669,6 +701,31 @@
         "<div class='tm-store-grid' id='tm-store-grid'>" + cards + "</div>" +
         "<div class='tm-store-settings' id='tm-store-settings' style='display:none'>" +
           "<h4>Einstellungen</h4>" +
+          "<div class='tm-store-update-hub'>" +
+            "<div class='tm-store-update-hub-head'>" +
+              "<div class='tm-store-update-hub-title'>Loader Update-Zentrale</div>" +
+              "<span class='tm-store-update-chip " + updateChipClass + "'>" + updateChipText + "</span>" +
+            "</div>" +
+            "<div class='tm-store-update-hub-grid'>" +
+              "<div class='tm-store-update-kv'><strong>Lokal:</strong> v" + escapeHtml(LOADER_LOCAL_VERSION) + "</div>" +
+              "<div class='tm-store-update-kv'><strong>Remote:</strong> v" + escapeHtml(RUNTIME.loaderUpdate.remoteVersion || "-") + "</div>" +
+              "<div class='tm-store-update-kv'><strong>Letzte Prüfung:</strong> " + escapeHtml(checkedAtText) + "</div>" +
+              "<div class='tm-store-update-kv'><strong>Nächste Prüfung:</strong> " + escapeHtml(nextCheckText) + "</div>" +
+            "</div>" +
+            ((RUNTIME.loaderUpdate.commitTitle || RUNTIME.loaderUpdate.commitUrl)
+              ? (
+                "<div class='tm-store-update-kv' style='margin-top:8px'><strong>Letzter Commit:</strong> " +
+                escapeHtml(RUNTIME.loaderUpdate.commitTitle || "-") +
+                (RUNTIME.loaderUpdate.commitSha ? " <span style='opacity:.8'>(#" + escapeHtml(RUNTIME.loaderUpdate.commitSha) + ")</span>" : "") +
+                (RUNTIME.loaderUpdate.commitUrl ? " <a class='tm-store-link' target='_blank' href='" + RUNTIME.loaderUpdate.commitUrl + "'>GitHub</a>" : "") +
+                "</div>"
+              ) : "") +
+            "<div class='tm-store-update-hub-actions'>" +
+              "<button class='tm-store-update-btn' id='tm-store-update-check-btn' type='button'>Jetzt prüfen</button> " +
+              (RUNTIME.loaderUpdate.hasUpdate ? "<button class='tm-store-update-btn' id='tm-store-update-now-btn' type='button'>Update installieren</button> " : "") +
+              "<button class='tm-store-confirm-btn' id='tm-store-update-confirm-btn' type='button'>Als gelesen markieren</button>" +
+            "</div>" +
+          "</div>" +
           "<div class='tm-store-settings-grid'>" +
             "<div class='tm-store-field'>" +
               "<label>Update-Intervall</label>" +
@@ -681,14 +738,7 @@
                 "<option value='43200000'>12 Stunden</option>" +
               "</select>" +
             "</div>" +
-            "<div class='tm-store-field'>" +
-              "<label>Loader-Update</label>" +
-              "<div>" +
-                "<button class='tm-store-update-btn' id='tm-store-update-check-btn' type='button'>Jetzt prüfen</button> " +
-                (RUNTIME.loaderUpdate.hasUpdate ? "<button class='tm-store-update-btn' id='tm-store-update-now-btn' type='button'>Aktualisieren</button> " : "") +
-                "<button class='tm-store-confirm-btn' id='tm-store-update-confirm-btn' type='button'>Update bestätigen</button>" +
-              "</div>" +
-            "</div>" +
+            "<div class='tm-store-field'><label>Hinweis</label><input type='text' value='Update-Flow ist jetzt oben in der Update-Zentrale.' readonly></div>" +
           "</div>" +
           "<div class='tm-store-app-settings' id='tm-store-app-settings'></div>" +
         "</div>" +
@@ -792,19 +842,31 @@
     });
     debugRefresh.addEventListener("click", renderDebugLogs);
     updateCheckBtn.addEventListener("click", function () {
+      updateCheckBtn.disabled = true;
+      updateCheckBtn.textContent = "Prüfe...";
       checkLoaderUpdate(true).then(function () {
         renderStoreOverlay(RUNTIME.apps, loadSettings());
+        showToast("Update-Check", "Update-Status wurde aktualisiert.");
+      }).finally(function () {
+        updateCheckBtn.disabled = false;
+        updateCheckBtn.textContent = "Jetzt prüfen";
       });
     });
     if (updateNowBtn) {
       updateNowBtn.addEventListener("click", function () {
-        var url = LOADER_REMOTE_URL + "?t=" + now();
+        var url = LOADER_REMOTE_URL + "?t=" + now() + "&r=" + Math.random().toString(36).slice(2);
+        showToast("Update öffnen", "Tampermonkey-Update wird in neuem Tab geöffnet.");
         window.open(url, "_blank");
       });
     }
     if (updateConfirmBtn) {
       updateConfirmBtn.addEventListener("click", function () {
+        if (!RUNTIME.loaderUpdate.remoteVersion) {
+          showToast("Kein Update", "Aktuell gibt es keine Remote-Version zum Bestätigen.");
+          return;
+        }
         saveUpdateAck(RUNTIME.loaderUpdate.remoteVersion || "");
+        showToast("Bestätigt", "Update wurde als gelesen markiert.");
         renderStoreOverlay(RUNTIME.apps, loadSettings());
       });
     }
