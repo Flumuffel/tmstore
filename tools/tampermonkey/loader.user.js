@@ -1197,7 +1197,7 @@
   async function boot() {
     RUNTIME.loaderUpdate = normalizeUpdateStateWithLocalVersion(loadUpdateState());
     startPeriodicUpdateChecks();
-    checkLoaderUpdate(false).then(function () {
+    checkLoaderUpdate(true).then(function () {
       if (document.body) {
         renderStoreOverlay(RUNTIME.apps, loadSettings());
       }
