@@ -16,8 +16,8 @@
 (function () {
   "use strict";
 
-  var GITHUB_OWNER = "your-org";
-  var GITHUB_REPO = "your-tm-store-repo";
+  var GITHUB_OWNER = "Flumuffel";
+  var GITHUB_REPO = "tmstore";
   var GITHUB_REF = "main";
   var RAW_BASE = "https://raw.githubusercontent.com/" + GITHUB_OWNER + "/" + GITHUB_REPO + "/" + GITHUB_REF;
   var MANIFEST_URL = RAW_BASE + "/api/tm-store/apps.json";
@@ -34,7 +34,8 @@
   };
   var RUNTIME = {
     apps: [],
-    loaded: {}
+    loaded: {},
+    status: []
   };
 
   function now() {
@@ -180,8 +181,10 @@
       var execute = new Function(wrapped);
       execute();
       logInfo("Loaded app " + app.id + "@" + app.version);
+      return { ok: true, message: "Geladen" };
     } catch (err) {
       console.error("[TM-STORE] Failed to run app " + app.id, err);
+      return { ok: false, message: "Laufzeitfehler: " + (err && err.message ? err.message : "Unbekannt") };
     }
   }
 
@@ -206,8 +209,12 @@
       if (found && !RUNTIME.loaded[appId]) {
         runApp(found).then(function () {
           RUNTIME.loaded[appId] = true;
+          RUNTIME.status.push({ appId: appId, ok: true, message: "Geladen (manuell aktiviert)" });
+          renderBootFeedback();
         }).catch(function (err) {
           console.error("[TM-STORE] app toggle load failed", err);
+          RUNTIME.status.push({ appId: appId, ok: false, message: "Fehler: " + (err && err.message ? err.message : "Unbekannt") });
+          renderBootFeedback();
         });
       }
     } else {
@@ -219,6 +226,21 @@
     var changelog = (app.changelog || []).map(function (line) {
       return "<li>" + line + "</li>";
     }).join("");
+    var last = null;
+    for (var i = RUNTIME.status.length - 1; i >= 0; i -= 1) {
+      if (RUNTIME.status[i].appId === app.id) {
+        last = RUNTIME.status[i];
+        break;
+      }
+    }
+    var statusBadge = "<span class='tm-badge neutral'>Nicht geladen</span>";
+    if (last) {
+      statusBadge = last.ok ? "<span class='tm-badge ok'>Geladen</span>" : "<span class='tm-badge fail'>Fehler</span>";
+    } else if (enabled) {
+      statusBadge = "<span class='tm-badge neutral'>Aktiviert</span>";
+    } else {
+      statusBadge = "<span class='tm-badge neutral'>Deaktiviert</span>";
+    }
     return (
       "<article class='tm-store-card'>" +
         "<div class='tm-store-card-head'>" +
@@ -227,6 +249,7 @@
         "</div>" +
         "<p>" + app.description + "</p>" +
         "<div class='tm-store-meta'>Status: " + app.status + " | ID: " + app.id + "</div>" +
+        "<div class='tm-store-state-row'>" + statusBadge + "</div>" +
         "<ul>" + changelog + "</ul>" +
         "<button data-app-toggle='" + app.id + "' class='tm-store-btn " + (enabled ? "is-on" : "is-off") + "'>" +
           (enabled ? "Deaktivieren" : "Aktivieren") +
@@ -238,21 +261,32 @@
   function ensureStoreStyles() {
     if (document.getElementById("tm-store-style")) return;
     GM_addStyle(
-      ".tm-store-fab{position:fixed;right:16px;bottom:16px;z-index:999999;background:#1f2940;color:#e8eefc;border:1px solid #4d5f88;border-radius:999px;padding:10px 14px;cursor:pointer;font-weight:700}" +
-      ".tm-store-overlay{position:fixed;inset:0;background:rgba(2,6,15,.65);z-index:999998;display:none}" +
-      ".tm-store-panel{position:absolute;right:20px;top:20px;width:min(680px,calc(100% - 40px));max-height:calc(100% - 40px);overflow:auto;background:#111827;color:#eef2ff;border:1px solid #334155;border-radius:12px;padding:14px}" +
+      ".tm-store-fab{position:fixed;right:18px;bottom:18px;z-index:999999;background:linear-gradient(135deg,#6d7dff,#39b7ff);color:#061326;border:none;border-radius:999px;padding:12px 16px;cursor:pointer;font-weight:800;box-shadow:0 12px 28px rgba(0,0,0,.35)}" +
+      ".tm-store-overlay{position:fixed;inset:0;background:rgba(4,10,22,.7);backdrop-filter:blur(6px);z-index:999998;display:none;align-items:center;justify-content:center;padding:24px}" +
+      ".tm-store-panel{width:min(960px,96vw);max-height:92vh;overflow:auto;background:radial-gradient(circle at top,#1a2642 0%,#0f1628 58%,#0c1321 100%);color:#eef2ff;border:1px solid #40547a;border-radius:18px;padding:18px;box-shadow:0 30px 60px rgba(0,0,0,.45)}" +
       ".tm-store-top{display:flex;justify-content:space-between;align-items:center;gap:8px}" +
-      ".tm-store-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;margin-top:12px}" +
-      ".tm-store-card{background:#1a2234;border:1px solid #344560;border-radius:10px;padding:10px}" +
+      ".tm-store-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-top:14px}" +
+      ".tm-store-card{background:linear-gradient(180deg,#1d2a45 0%,#16223a 100%);border:1px solid #46608d;border-radius:12px;padding:12px}" +
       ".tm-store-card h4{margin:0}" +
       ".tm-store-card p{margin:8px 0;color:#c2cde3}" +
       ".tm-store-card ul{margin:8px 0 0 18px;padding:0;color:#9eb0d1}" +
       ".tm-store-card-head{display:flex;justify-content:space-between;align-items:center;gap:8px}" +
       ".tm-store-meta{font-size:12px;color:#8fa0c3}" +
-      ".tm-store-btn{margin-top:10px;padding:7px 10px;border-radius:8px;border:1px solid #566991;background:#2b3b59;color:#eef2ff;cursor:pointer}" +
+      ".tm-store-state-row{margin-top:8px}" +
+      ".tm-badge{display:inline-block;padding:4px 8px;border-radius:999px;font-size:12px;font-weight:700}" +
+      ".tm-badge.ok{background:#175b35;color:#d5ffe7;border:1px solid #39b86f}" +
+      ".tm-badge.fail{background:#631d1d;color:#ffdede;border:1px solid #d14f4f}" +
+      ".tm-badge.neutral{background:#243653;color:#dbe8ff;border:1px solid #506c99}" +
+      ".tm-store-btn{margin-top:10px;padding:8px 12px;border-radius:10px;border:1px solid #6586be;background:#2e4270;color:#eef2ff;cursor:pointer;font-weight:700}" +
       ".tm-store-btn.is-on{background:#7f1d1d;border-color:#ef4444}" +
-      ".tm-store-close{background:#1f2940;color:#e8eefc;border:1px solid #4d5f88;border-radius:8px;padding:6px 10px;cursor:pointer}" +
-      ".tm-store-link{color:#9dc2ff;text-decoration:none}"
+      ".tm-store-close{background:#243653;color:#e8eefc;border:1px solid #5f7baa;border-radius:10px;padding:8px 12px;cursor:pointer}" +
+      ".tm-store-link{color:#9dc2ff;text-decoration:none}" +
+      ".tm-store-feedback{position:fixed;left:50%;top:18px;transform:translateX(-50%);z-index:999999;background:#101a2e;border:1px solid #4c628f;border-radius:12px;color:#e9f0ff;min-width:360px;max-width:92vw;padding:10px 12px;box-shadow:0 14px 30px rgba(0,0,0,.4)}" +
+      ".tm-store-feedback h4{margin:0 0 8px 0;font-size:14px}" +
+      ".tm-store-feedback ul{margin:0;padding-left:18px}" +
+      ".tm-store-feedback li{font-size:13px;margin:2px 0}" +
+      ".tm-store-feedback.ok li{color:#bff5d2}" +
+      ".tm-store-feedback.warn li{color:#ffd3d3}"
     );
     var styleMarker = document.createElement("meta");
     styleMarker.id = "tm-store-style";
@@ -271,7 +305,7 @@
       fab.addEventListener("click", function () {
         var overlay = document.getElementById("tm-store-overlay");
         if (!overlay) return;
-        overlay.style.display = "block";
+        overlay.style.display = "flex";
       });
       document.body.appendChild(fab);
     }
@@ -304,7 +338,7 @@
           "<button class='tm-store-close' id='tm-store-close' type='button'>Schliessen</button>" +
         "</div>" +
         "<p>Quelle: <a class='tm-store-link' target='_blank' href='" + REPO_URL + "'>" + REPO_URL + "</a></p>" +
-        "<p>Governance: Apps werden ueber Pull Requests + Reviews in GitHub freigegeben.</p>" +
+        "<p>Governance: Apps werden über Pull Requests + Reviews in GitHub freigegeben.</p>" +
         "<div class='tm-store-grid'>" + cards + "</div>" +
       "</div>";
 
@@ -320,6 +354,36 @@
         toggleApp(appId);
       });
     }
+  }
+
+  function renderBootFeedback() {
+    var host = document.getElementById("tm-store-feedback");
+    if (!host) {
+      host = document.createElement("div");
+      host.id = "tm-store-feedback";
+      host.className = "tm-store-feedback";
+      document.body.appendChild(host);
+    }
+    var statuses = RUNTIME.status.slice(-8);
+    var okCount = 0;
+    var failCount = 0;
+    var list = statuses.map(function (s) {
+      if (s.ok) okCount += 1;
+      else failCount += 1;
+      var icon = s.ok ? "✅" : "❌";
+      return "<li>" + icon + " " + s.appId + ": " + s.message + "</li>";
+    }).join("");
+    if (!list) {
+      list = "<li>Keine App geladen (alles deaktiviert oder nicht passend).</li>";
+    }
+    host.className = "tm-store-feedback " + (failCount > 0 ? "warn" : "ok");
+    host.innerHTML =
+      "<h4>TM Store Status • Geladen: " + okCount + " • Fehler: " + failCount + "</h4>" +
+      "<ul>" + list + "</ul>";
+    window.setTimeout(function () {
+      var current = document.getElementById("tm-store-feedback");
+      if (current) current.remove();
+    }, 7000);
   }
 
   async function boot() {
@@ -343,9 +407,11 @@
     RUNTIME.apps = apps;
     if (document.body) {
       renderStoreOverlay(apps, settings);
+      renderBootFeedback();
     } else {
       document.addEventListener("DOMContentLoaded", function () {
         renderStoreOverlay(apps, settings);
+        renderBootFeedback();
       });
     }
     for (var i = 0; i < apps.length; i += 1) {
@@ -353,8 +419,27 @@
       if (!isApprovedAndPublished(app)) continue;
       if (!appIsEnabled(app.id, settings)) continue;
       if (app.match && !new RegExp(app.match).test(window.location.href)) continue;
-      await runApp(app);
-      RUNTIME.loaded[app.id] = true;
+      try {
+        var result = await runApp(app);
+        if (result && result.ok) {
+          RUNTIME.loaded[app.id] = true;
+        }
+        RUNTIME.status.push({
+          appId: app.id,
+          ok: !!(result && result.ok),
+          message: result && result.message ? result.message : "Unbekannt"
+        });
+      } catch (err) {
+        RUNTIME.status.push({
+          appId: app.id,
+          ok: false,
+          message: "Fehler: " + (err && err.message ? err.message : "Unbekannt")
+        });
+      }
+    }
+    if (document.body) {
+      renderStoreOverlay(apps, settings);
+      renderBootFeedback();
     }
   }
 
