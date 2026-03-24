@@ -23,6 +23,7 @@ def parse_header(content: str) -> dict:
 
     data = {}
     changelog = []
+    settings = []
 
     for raw_line in m.group("body").splitlines():
         line = raw_line.strip()
@@ -35,10 +36,44 @@ def parse_header(content: str) -> dict:
         value = value.strip()
         if key == "changelog":
             changelog.append(value)
+        elif key == "settings":
+            parts = value.split(" ", 2)
+            if len(parts) < 2:
+                raise ValueError("Ungültiges @settings Format. Erwartet: @settings <key> <type> <default>")
+            setting_key = parts[0].strip()
+            setting_type = parts[1].strip().lower()
+            raw_default = parts[2].strip() if len(parts) >= 3 else ""
+            if setting_type not in {"toggle", "string", "number"}:
+                raise ValueError(f"Ungültiger @settings Typ '{setting_type}' für '{setting_key}'")
+            default_value: object
+            if setting_type == "toggle":
+                default_value = parse_bool(raw_default or "false")
+            elif setting_type == "number":
+                try:
+                    default_value = float(raw_default)
+                    if int(default_value) == default_value:
+                        default_value = int(default_value)
+                except Exception as exc:
+                    raise ValueError(f"Ungültiger Number-Default für '{setting_key}': {raw_default}") from exc
+            else:
+                default_value = raw_default
+                if len(default_value) >= 2 and (
+                    (default_value.startswith('"') and default_value.endswith('"'))
+                    or (default_value.startswith("'") and default_value.endswith("'"))
+                ):
+                    default_value = default_value[1:-1]
+            settings.append(
+                {
+                    "key": setting_key,
+                    "type": setting_type,
+                    "default": default_value,
+                }
+            )
         else:
             data[key] = value
 
     data["changelog"] = changelog
+    data["settings"] = settings
     return data
 
 
@@ -54,6 +89,7 @@ def build_app_entry(meta: dict, rel_js_path: str, raw_base: str) -> dict:
     return {
         "id": app_id,
         "name": meta.get("name", app_id),
+        "author": meta.get("author", ""),
         "description": meta.get("description", ""),
         "version": meta.get("version", "0.0.0"),
         "status": meta.get("status", "pending"),
@@ -63,6 +99,7 @@ def build_app_entry(meta: dict, rel_js_path: str, raw_base: str) -> dict:
         "match": meta.get("match", r"^https:\/\/intranet\.klixa\.ch\/.*$"),
         "sha256": meta.get("sha256", ""),
         "changelog": meta.get("changelog", []),
+        "settings": meta.get("settings", []),
     }
 
 

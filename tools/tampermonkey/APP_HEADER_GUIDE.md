@@ -31,12 +31,33 @@ Beispiele:
 ## Optionale Felder
 
 - `@name`
+- `@author`
 - `@description`
 - `@status` (z. B. `published`)
 - `@approved` (`true`/`false`)
 - `@css` (Dateiname relativ zur App-Datei)
 - `@sha256`
 - `@changelog` (mehrfach verwendbar)
+- `@settings` (mehrfach verwendbar)
+
+## App-Settings per Header
+
+Format:
+
+- `@settings <key> toggle <true|false>`
+- `@settings <key> string "<default>"`
+- `@settings <key> number <default>`
+
+Beispiele:
+
+```text
+@author ""
+@settings modul1 toggle true
+@settings modul2 string ""
+@settings refreshSeconds number 30
+```
+
+Diese Felder werden ins `apps.json` übernommen und im Store als App-spezifische Einstellungen gerendert.
 
 ## Build lokal
 

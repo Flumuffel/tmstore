@@ -1,11 +1,14 @@
 /* ==TMStoreApp==
 @id klixa-enhancements
 @name Klixa Enhancements
-@version 2.0.0
+@author PHO
+@version 2.0.2
 @description Legacy Enhancements
 @status published
 @approved true
 @match ^https:\/\/intranet\.klixa\.ch\/.*$
+@settings modul1 toggle true
+@settings modul2 string ""
 @changelog Legacy old-loader 1:1 übernommen
 ==/TMStoreApp== */
 

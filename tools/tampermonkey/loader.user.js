@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Klixa TM Store Loader
 // @namespace    klixa.tm.store
-// @version      0.4.0
+// @version      0.4.2
 // @description  Loads approved Intranet apps from GitHub Raw manifest
 // @match        https://intranet.klixa.ch/*
 // @updateURL    https://raw.githubusercontent.com/Flumuffel/tmstore/refs/heads/main/tools/tampermonkey/loader.user.js
@@ -63,6 +63,7 @@
     status: [],
     logs: [],
     loadedCss: {},
+    fastCmdApplied: {},
     loaderUpdate: {
       checkedAt: 0,
       remoteVersion: null,
@@ -254,6 +255,15 @@
     return {};
   }
 
+  function escapeHtml(str) {
+    return String(str == null ? "" : str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
   function loadUpdateState() {
     var raw = GM_getValue(UPDATE_CHECK_KEY, "");
     if (!raw) return { checkedAt: 0, remoteVersion: null, hasUpdate: false, commitTitle: null, commitUrl: null, commitSha: null };
@@ -412,6 +422,9 @@
         }
       }
       if (found && !RUNTIME.loaded[appId]) {
+        var appCfg = getAppSettings(settings, appId);
+        var authorValue = appCfg.author != null ? appCfg.author : found.author;
+        applyAuthorFastCmd(appId, authorValue);
         runApp(found).then(function () {
           RUNTIME.loaded[appId] = true;
           RUNTIME.status.push({ appId: appId, ok: true, message: "Geladen (manuell aktiviert)" });
@@ -522,8 +535,10 @@
       ".tm-store-field{display:flex;flex-direction:column;gap:6px}" +
       ".tm-store-field label{font-size:12px;color:#bdd1f5}" +
       ".tm-store-field select,.tm-store-field textarea,.tm-store-field input{background:#0d1629;color:#e8f1ff;border:1px solid #4f6591;border-radius:8px;padding:8px;font-size:12px}" +
+      ".tm-store-field .tm-store-toggle{width:auto;accent-color:#6ea8ff}" +
       ".tm-store-app-settings{margin-top:10px;display:grid;gap:10px}" +
-      ".tm-store-app-setting-item{border:1px solid #425a85;border-radius:10px;padding:10px;background:rgba(15,23,42,.5)}"
+      ".tm-store-app-setting-item{border:1px solid #425a85;border-radius:10px;padding:10px;background:rgba(15,23,42,.5)}" +
+      ".tm-store-hidden{display:none !important}"
     ;
     root.appendChild(style);
   }
@@ -607,12 +622,12 @@
             "<button class='tm-store-close' id='tm-store-close' type='button'>Schließen</button>" +
           "</div>" +
         "</div>" +
-        "<div class='tm-store-meta'>" +
+        "<div class='tm-store-meta' id='tm-store-meta'>" +
           "<p><strong>Quelle:</strong> <a class='tm-store-link' target='_blank' href='" + REPO_URL + "'>" + REPO_URL + "</a></p>" +
           "<p><strong>Governance:</strong> Apps werden über Pull Requests + Reviews in GitHub freigegeben.</p>" +
         "</div>" +
-        updateBanner +
-        "<div class='tm-store-grid'>" + cards + "</div>" +
+        "<div id='tm-store-update-banner-wrap'>" + updateBanner + "</div>" +
+        "<div class='tm-store-grid' id='tm-store-grid'>" + cards + "</div>" +
         "<div class='tm-store-settings' id='tm-store-settings' style='display:none'>" +
           "<h4>Einstellungen</h4>" +
           "<div class='tm-store-settings-grid'>" +
@@ -659,8 +674,53 @@
     var updateInterval = root.getElementById("tm-store-update-interval");
     var settingsWrap = root.getElementById("tm-store-settings");
     var appSettingsWrap = root.getElementById("tm-store-app-settings");
+    var storeGrid = root.getElementById("tm-store-grid");
+    var storeMeta = root.getElementById("tm-store-meta");
+    var updateBannerWrap = root.getElementById("tm-store-update-banner-wrap");
     var debugWrap = root.getElementById("tm-store-debug");
     var debugRefresh = root.getElementById("tm-store-debug-refresh");
+    function saveSettingsWithToast(next, reason) {
+      saveSettings(next);
+      addLog("info", "settings", "Einstellungen gespeichert", {
+        reason: reason || "manual",
+        intervalMs: next.update && next.update.intervalMs
+      });
+      showToast("Einstellungen gespeichert", "Änderungen wurden übernommen.");
+    }
+    function collectAndSaveSettings(reason) {
+      var next = loadSettings();
+      next.update = next.update || {};
+      next.update.intervalMs = parseInt((updateInterval && updateInterval.value) || "", 10) || UPDATE_CHECK_INTERVAL_MS;
+      next.appSettings = next.appSettings || {};
+      for (var idx = 0; idx < published.length; idx += 1) {
+        var app = published[idx];
+        var schema = Array.isArray(app.settings) ? app.settings : [];
+        var current = next.appSettings[app.id] || {};
+        for (var sIdx = 0; sIdx < schema.length; sIdx += 1) {
+          var s = schema[sIdx];
+          var field = root.getElementById("tm-app-setting-" + app.id + "-" + s.key);
+          if (!field) continue;
+          if (s.type === "toggle") current[s.key] = !!field.checked;
+          else if (s.type === "number") current[s.key] = Number(field.value || 0);
+          else current[s.key] = String(field.value || "");
+        }
+        var authorField = root.getElementById("tm-app-author-" + app.id);
+        if (authorField) {
+          current.author = String(authorField.value || "");
+          applyAuthorFastCmd(app.id, current.author);
+        }
+        next.appSettings[app.id] = current;
+      }
+      saveSettingsWithToast(next, reason || "manual");
+      return next;
+    }
+    function setSettingsView(active) {
+      if (settingsWrap) settingsWrap.style.display = active ? "block" : "none";
+      if (storeGrid) storeGrid.classList.toggle("tm-store-hidden", !!active);
+      if (storeMeta) storeMeta.classList.toggle("tm-store-hidden", !!active);
+      if (updateBannerWrap) updateBannerWrap.classList.toggle("tm-store-hidden", !!active);
+      if (debugWrap) debugWrap.style.display = "none";
+    }
     function renderDebugLogs() {
       var target = root.getElementById("tm-store-debug-pre");
       if (!target) return;
@@ -684,13 +744,12 @@
     debugBtn.addEventListener("click", function () {
       var open = debugWrap.style.display !== "none";
       debugWrap.style.display = open ? "none" : "block";
-      settingsWrap.style.display = "none";
+      setSettingsView(false);
       if (!open) renderDebugLogs();
     });
     settingsBtn.addEventListener("click", function () {
-      var open = settingsWrap.style.display !== "none";
-      settingsWrap.style.display = open ? "none" : "block";
-      debugWrap.style.display = "none";
+      var open = settingsWrap && settingsWrap.style.display !== "none";
+      setSettingsView(!open);
       if (!open && updateInterval) {
         updateInterval.value = String(getUpdateIntervalMs(settings));
       }
@@ -715,35 +774,68 @@
     }
     if (appSettingsWrap) {
       appSettingsWrap.innerHTML = published.map(function (app) {
-        var value = JSON.stringify(getAppSettings(settings, app.id), null, 2);
+        var schema = Array.isArray(app.settings) ? app.settings : [];
+        var currentSettings = getAppSettings(settings, app.id);
+        var authorDefault = app.author != null ? app.author : "";
+        var authorValue = currentSettings.author != null ? currentSettings.author : authorDefault;
+        var fields = schema.map(function (s) {
+          var current = currentSettings[s.key];
+          if (current == null) current = s.default;
+          var id = "tm-app-setting-" + app.id + "-" + s.key;
+          if (s.type === "toggle") {
+            return (
+              "<div class='tm-store-field'>" +
+                "<label for='" + id + "'>" + escapeHtml(s.key) + " (toggle)</label>" +
+                "<input class='tm-store-toggle' id='" + id + "' data-settings-field='1' data-app-id='" + app.id + "' data-key='" + escapeHtml(s.key) + "' data-type='toggle' type='checkbox' " + (current ? "checked" : "") + ">" +
+              "</div>"
+            );
+          }
+          if (s.type === "number") {
+            return (
+              "<div class='tm-store-field'>" +
+                "<label for='" + id + "'>" + escapeHtml(s.key) + " (number)</label>" +
+                "<input id='" + id + "' data-settings-field='1' data-app-id='" + app.id + "' data-key='" + escapeHtml(s.key) + "' data-type='number' type='number' value='" + escapeHtml(current) + "'>" +
+              "</div>"
+            );
+          }
+          return (
+            "<div class='tm-store-field'>" +
+              "<label for='" + id + "'>" + escapeHtml(s.key) + " (string)</label>" +
+              "<input id='" + id + "' data-settings-field='1' data-app-id='" + app.id + "' data-key='" + escapeHtml(s.key) + "' data-type='string' type='text' value='" + escapeHtml(current) + "'>" +
+            "</div>"
+          );
+        }).join("");
+        fields +=
+          "<div class='tm-store-field'>" +
+            "<label for='tm-app-author-" + app.id + "'>author (@author)</label>" +
+            "<input id='tm-app-author-" + app.id + "' data-settings-field='1' data-app-id='" + app.id + "' data-key='author' data-type='string' type='text' value='" + escapeHtml(authorValue) + "'>" +
+          "</div>";
+        if (!fields) {
+          fields = "<div class='tm-store-field'><label>Keine Header-Settings für diese App definiert.</label></div>";
+        }
         return (
           "<div class='tm-store-app-setting-item'>" +
-            "<strong>" + app.name + "</strong>" +
-            "<div class='tm-store-field'>" +
-              "<label>App-Einstellungen (JSON) für " + app.id + "</label>" +
-              "<textarea id='tm-app-settings-" + app.id + "' rows='4'>" + value + "</textarea>" +
-            "</div>" +
+            "<strong>" + escapeHtml(app.name) + "</strong>" +
+            fields +
           "</div>"
         );
       }).join("");
+      var settingFields = appSettingsWrap.querySelectorAll("[data-settings-field='1']");
+      for (var f = 0; f < settingFields.length; f += 1) {
+        settingFields[f].addEventListener("blur", function () {
+          collectAndSaveSettings("focus-loss");
+        });
+      }
+    }
+    if (updateInterval) {
+      updateInterval.value = String(getUpdateIntervalMs(settings));
+      updateInterval.addEventListener("blur", function () {
+        collectAndSaveSettings("focus-loss");
+      });
     }
     if (saveSettingsBtn) {
       saveSettingsBtn.addEventListener("click", function () {
-        var next = loadSettings();
-        next.update = next.update || {};
-        next.update.intervalMs = parseInt((updateInterval && updateInterval.value) || "", 10) || UPDATE_CHECK_INTERVAL_MS;
-        next.appSettings = next.appSettings || {};
-        for (var idx = 0; idx < published.length; idx += 1) {
-          var app = published[idx];
-          var area = root.getElementById("tm-app-settings-" + app.id);
-          if (!area) continue;
-          var parsedValue = safeParse(area.value || "{}", {});
-          if (parsedValue && typeof parsedValue === "object") {
-            next.appSettings[app.id] = parsedValue;
-          }
-        }
-        saveSettings(next);
-        addLog("info", "settings", "Einstellungen gespeichert", { intervalMs: next.update.intervalMs });
+        var next = collectAndSaveSettings("button");
         renderStoreOverlay(RUNTIME.apps, next);
       });
     }
@@ -850,6 +942,54 @@
     }, 4200);
   }
 
+  function showToast(title, message) {
+    var root = ensureStoreRoot();
+    var host = root.getElementById("tm-store-feedback");
+    if (!host) {
+      host = document.createElement("div");
+      host.id = "tm-store-feedback";
+      root.appendChild(host);
+    }
+    host.className = "tm-store-feedback ok";
+    host.innerHTML =
+      "<h4>" + escapeHtml(title || "Hinweis") + "</h4>" +
+      "<ul><li>" + escapeHtml(message || "") + "</li></ul>";
+    window.setTimeout(function () {
+      var current = root.getElementById("tm-store-feedback");
+      if (current) current.remove();
+    }, 2200);
+  }
+
+  function applyAuthorFastCmd(appId, authorValue) {
+    var author = String(authorValue || "").trim();
+    if (!author) return;
+    if (RUNTIME.fastCmdApplied[appId]) return;
+    var tries = 0;
+    var maxTries = 25;
+    var timer = window.setInterval(function () {
+      tries += 1;
+      var input = document.querySelector("#fast_cmd");
+      if (!input) {
+        if (tries >= maxTries) window.clearInterval(timer);
+        return;
+      }
+      input.focus();
+      input.value = "a " + author;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true }));
+      input.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true }));
+      if (input.form && typeof input.form.requestSubmit === "function") {
+        input.form.requestSubmit();
+      } else if (input.form) {
+        input.form.submit();
+      }
+      RUNTIME.fastCmdApplied[appId] = true;
+      addLog("info", "author", "Author-Befehl an #fast_cmd gesendet", { appId: appId, author: author });
+      window.clearInterval(timer);
+    }, 350);
+  }
+
   async function boot() {
     RUNTIME.loaderUpdate = loadUpdateState();
     checkLoaderUpdate(false).then(function () {
@@ -904,6 +1044,9 @@
         addLog("info", "app:" + app.id, "Übersprungen: URL-Match trifft nicht zu", { match: app.match, url: window.location.href });
         continue;
       }
+      var appCfg = getAppSettings(settings, app.id);
+      var authorValue = appCfg.author != null ? appCfg.author : app.author;
+      applyAuthorFastCmd(app.id, authorValue);
       try {
         var result = await runApp(app);
         if (result && result.ok) {
