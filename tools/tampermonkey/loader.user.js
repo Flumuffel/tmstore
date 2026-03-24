@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Klixa TM Store Loader
 // @namespace    klixa.tm.store
-// @version      0.4.20
+// @version      0.4.21
 // @author LWE
 // @description  Loads approved Intranet apps from GitHub Raw manifest
 // @match        https://intranet.klixa.ch/*
@@ -329,6 +329,14 @@
     } catch (err) {
       return "-";
     }
+  }
+
+  function formatDurationShort(ms) {
+    var total = Math.max(0, Math.floor(Number(ms || 0) / 1000));
+    var mins = Math.floor(total / 60);
+    var secs = total % 60;
+    if (mins > 0) return mins + "m " + secs + "s";
+    return secs + "s";
   }
 
   function loadUpdateState() {
@@ -831,7 +839,8 @@
             ((RUNTIME.loaderUpdate.commitRateLimitedUntil && Number(RUNTIME.loaderUpdate.commitRateLimitedUntil) > now())
               ? (
                 "<div class='tm-store-update-kv error' style='margin-top:8px'><strong>Letzter Commit:</strong> Commit-Info aktuell rate-limited. Nächster Versuch nach " +
-                escapeHtml(formatDateTimeBerlin(RUNTIME.loaderUpdate.commitRateLimitedUntil, true)) +
+                escapeHtml(formatDurationShort(Number(RUNTIME.loaderUpdate.commitRateLimitedUntil) - now())) +
+                " (" + escapeHtml(formatDateTimeBerlin(RUNTIME.loaderUpdate.commitRateLimitedUntil, true)) + ")" +
                 ".</div>"
               ) : "") +
             ((RUNTIME.loaderUpdate.commitTitle || RUNTIME.loaderUpdate.commitUrl)
@@ -1122,16 +1131,24 @@
 
     try {
       var remoteSource = "";
-      try {
-        addLog("info", "update", "Prüfe Loader-Update (GitHub API)", { url: LOADER_CONTENT_API_URL });
-        var apiTxt = await gmRequest(LOADER_CONTENT_API_URL + "&t=" + now());
-        var apiObj = safeParse(apiTxt, null);
-        if (apiObj && apiObj.content) {
-          remoteSource = decodeBase64Utf8(apiObj.content);
+      var commitCooldownUntil = loadCommitCooldownUntil();
+      var skipGithubApi = commitCooldownUntil && now() < commitCooldownUntil;
+      if (!skipGithubApi) {
+        try {
+          addLog("info", "update", "Prüfe Loader-Update (GitHub API)", { url: LOADER_CONTENT_API_URL });
+          var apiTxt = await gmRequest(LOADER_CONTENT_API_URL + "&t=" + now());
+          var apiObj = safeParse(apiTxt, null);
+          if (apiObj && apiObj.content) {
+            remoteSource = decodeBase64Utf8(apiObj.content);
+          }
+        } catch (apiErr) {
+          addLog("error", "update", "GitHub API fehlgeschlagen, nutze Raw-Fallback", {
+            error: apiErr && apiErr.message ? apiErr.message : "Unbekannt"
+          });
         }
-      } catch (apiErr) {
-        addLog("error", "update", "GitHub API fehlgeschlagen, nutze Raw-Fallback", {
-          error: apiErr && apiErr.message ? apiErr.message : "Unbekannt"
+      } else {
+        addLog("info", "update", "GitHub API übersprungen (RateLimit-Cooldown aktiv)", {
+          until: formatDateTimeBerlin(commitCooldownUntil, true)
         });
       }
       if (!remoteSource) {
@@ -1145,8 +1162,13 @@
       try {
         commit = await fetchLatestLoaderCommit();
       } catch (commitErr) {
+        var msg = commitErr && commitErr.message ? String(commitErr.message) : "Unbekannt";
+        if (msg.indexOf("HTTP 403") !== -1) {
+          commit.rateLimitedUntil = now() + (60 * 60 * 1000);
+          saveCommitCooldownUntil(commit.rateLimitedUntil);
+        }
         addLog("error", "update", "Commit-Changelog konnte nicht geladen werden", {
-          error: commitErr && commitErr.message ? commitErr.message : "Unbekannt"
+          error: msg
         });
       }
       state = {
