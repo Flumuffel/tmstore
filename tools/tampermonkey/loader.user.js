@@ -606,8 +606,9 @@
     }
 
     try {
-      addLog("info", "update", "Prüfe Loader-Update", { url: LOADER_REMOTE_URL });
-      var remoteSource = await gmRequestText(LOADER_REMOTE_URL);
+      var updateUrl = LOADER_REMOTE_URL + "?t=" + now();
+      addLog("info", "update", "Prüfe Loader-Update", { url: updateUrl });
+      var remoteSource = await gmRequestText(updateUrl);
       var remoteVersion = extractUserscriptVersion(remoteSource);
       var hasUpdate = !!(remoteVersion && isVersionNewer(remoteVersion, LOADER_LOCAL_VERSION));
       var commit = { title: null, url: null, sha: null };
