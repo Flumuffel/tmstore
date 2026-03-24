@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-03-24T09:40:54Z",
+  "updatedAt": "2026-03-24T09:42:12Z",
   "source": {
     "type": "github",
     "repository": "https://github.com/Flumuffel/tmstore",
@@ -20,7 +20,6 @@
       "match": "^https:\\/\\/intranet\\.klixa\\.ch\\/.*$",
       "sha256": "",
       "changelog": [
-        "Author-Feld auf @author umgestellt (Store steuert fast_cmd)",
         "Legacy old-loader 1:1 übernommen"
       ],
       "settings": [
