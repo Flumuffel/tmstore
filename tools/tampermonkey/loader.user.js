@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Klixa TM Store Loader
 // @namespace    klixa.tm.store
-// @version      0.4.21
+// @version      0.4.22
 // @author LWE
 // @description  Loads approved Intranet apps from GitHub Raw manifest
 // @match        https://intranet.klixa.ch/*
@@ -83,6 +83,10 @@
     fastCmdApplied: {},
     toastSeq: 0,
     updateTimerId: null,
+    storeUi: {
+      searchQuery: "",
+      page: 1
+    },
     loaderUpdate: {
       checkedAt: 0,
       remoteVersion: null,
@@ -663,7 +667,9 @@
       ".tm-store-version-pill{display:inline-flex;align-items:center;gap:6px;width:fit-content;padding:4px 9px;border-radius:999px;background:rgba(73,102,160,.28);border:1px solid rgba(129,168,244,.45);font-size:12px;color:#dce9ff}" +
       ".tm-store-meta{margin:12px 0 0 0;padding:10px 12px;border:1px solid rgba(91,123,184,.3);border-radius:12px;background:rgba(14,24,46,.45)}" +
       ".tm-store-meta p{margin:6px 0;color:#d3def6;font-size:13px}" +
-      ".tm-store-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(295px,1fr));gap:14px;margin-top:14px}" +
+      ".tm-store-search-wrap{margin-top:12px;padding:10px 12px;border:1px solid rgba(91,123,184,.3);border-radius:12px;background:rgba(14,24,46,.45);display:flex;gap:8px;align-items:center;flex-wrap:wrap}" +
+      ".tm-store-search-input{flex:1;min-width:260px;background:#0d1629;color:#e8f1ff;border:1px solid #4f6591;border-radius:10px;padding:9px 11px;font-size:13px}" +
+      ".tm-store-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:14px}" +
       ".tm-store-card{position:relative;background:linear-gradient(180deg,rgba(39,57,91,.92) 0%,rgba(22,36,63,.94) 100%);border:1px solid #5878b0;border-radius:14px;padding:13px;box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 12px 22px rgba(0,0,0,.25)}" +
       ".tm-store-card::after{content:'';position:absolute;inset:0;border-radius:14px;background:linear-gradient(135deg,rgba(148,193,255,.08),rgba(255,255,255,0) 46%);pointer-events:none}" +
       ".tm-store-card h4{margin:0;font-size:17px;letter-spacing:.3px}" +
@@ -673,6 +679,9 @@
       ".tm-store-card-info{font-size:12px;color:#9fb3dd}" +
       ".tm-store-author-link{color:#9dc2ff;text-decoration:none}" +
       ".tm-store-author-link:hover{text-decoration:underline}" +
+      ".tm-store-empty{margin-top:14px;padding:12px;border:1px dashed #5e7ab1;border-radius:12px;background:rgba(11,19,37,.55);color:#d5e3ff;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}" +
+      ".tm-store-pager{margin-top:12px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}" +
+      ".tm-store-pager-info{font-size:12px;color:#bcd0f5}" +
       ".tm-store-state-row{margin-top:8px}" +
       ".tm-badge{display:inline-block;padding:4px 8px;border-radius:999px;font-size:12px;font-weight:700}" +
       ".tm-badge.ok{background:#175b35;color:#d5ffe7;border:1px solid #39b86f}" +
@@ -777,11 +786,34 @@
     }
 
     var published = apps.filter(isApprovedAndPublished);
+    var query = String((RUNTIME.storeUi && RUNTIME.storeUi.searchQuery) || "").trim().toLowerCase();
+    var filtered = published.filter(function (app) {
+      if (!query) return true;
+      var name = String(app.name || "").toLowerCase();
+      var author = String(app.author || "").toLowerCase();
+      return name.indexOf(query) !== -1 || author.indexOf(query) !== -1;
+    });
+    var perPage = 6;
+    var totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
+    var currentPage = Number(RUNTIME.storeUi.page || 1);
+    if (currentPage > totalPages) currentPage = totalPages;
+    if (currentPage < 1) currentPage = 1;
+    RUNTIME.storeUi.page = currentPage;
+    var start = (currentPage - 1) * perPage;
+    var pageItems = filtered.slice(start, start + perPage);
     var cards = "";
-    for (var i = 0; i < published.length; i += 1) {
-      var app = published[i];
+    for (var i = 0; i < pageItems.length; i += 1) {
+      var app = pageItems[i];
       var enabled = appIsEnabled(app.id, settings);
       cards += appCardHtml(app, enabled);
+    }
+    var emptyState = "";
+    if (!pageItems.length) {
+      emptyState =
+        "<div class='tm-store-empty' id='tm-store-empty'>" +
+          "<span>Keine Apps für diesen Filter gefunden.</span>" +
+          "<button class='tm-store-close' id='tm-store-filter-reset' type='button'>Filter reset</button>" +
+        "</div>";
     }
 
     var updateBanner = "";
@@ -822,7 +854,19 @@
           "<p><strong>Governance:</strong> Apps werden über Pull Requests + Reviews in GitHub freigegeben.</p>" +
         "</div>" +
         "<div id='tm-store-update-banner-wrap'>" + updateBanner + "</div>" +
+        "<div class='tm-store-search-wrap' id='tm-store-search-wrap'>" +
+          "<input class='tm-store-search-input' id='tm-store-search-input' type='text' placeholder='Apps suchen (Name oder Author)' value='" + escapeHtml(RUNTIME.storeUi.searchQuery || "") + "'>" +
+          "<button class='tm-store-close' id='tm-store-search-clear' type='button'>Clear</button>" +
+        "</div>" +
+        emptyState +
         "<div class='tm-store-grid' id='tm-store-grid'>" + cards + "</div>" +
+        "<div class='tm-store-pager' id='tm-store-pager'>" +
+          "<div class='tm-store-pager-info'>Seite " + currentPage + " / " + totalPages + " • Treffer: " + filtered.length + "</div>" +
+          "<div>" +
+            "<button class='tm-store-close' id='tm-store-page-prev' type='button' " + (currentPage <= 1 ? "disabled" : "") + ">Zurück</button> " +
+            "<button class='tm-store-close' id='tm-store-page-next' type='button' " + (currentPage >= totalPages ? "disabled" : "") + ">Weiter</button>" +
+          "</div>" +
+        "</div>" +
         "<div class='tm-store-settings' id='tm-store-settings' style='display:none'>" +
           "<h4>Einstellungen</h4>" +
           "<div class='tm-store-update-hub'>" +
@@ -902,6 +946,11 @@
     var updateBannerWrap = root.getElementById("tm-store-update-banner-wrap");
     var debugWrap = root.getElementById("tm-store-debug");
     var debugRefresh = root.getElementById("tm-store-debug-refresh");
+    var searchInput = root.getElementById("tm-store-search-input");
+    var searchClear = root.getElementById("tm-store-search-clear");
+    var filterReset = root.getElementById("tm-store-filter-reset");
+    var pagePrev = root.getElementById("tm-store-page-prev");
+    var pageNext = root.getElementById("tm-store-page-next");
     function saveSettingsWithToast(next, reason) {
       saveSettings(next);
       startPeriodicUpdateChecks();
@@ -1081,6 +1130,40 @@
       toggles[j].addEventListener("click", function (evt) {
         var appId = evt.target.getAttribute("data-app-toggle");
         toggleApp(appId);
+      });
+    }
+    if (searchInput) {
+      searchInput.addEventListener("input", function () {
+        RUNTIME.storeUi.searchQuery = String(searchInput.value || "");
+        RUNTIME.storeUi.page = 1;
+        renderStoreOverlay(RUNTIME.apps, loadSettings());
+      });
+    }
+    function resetSearchFilter() {
+      RUNTIME.storeUi.searchQuery = "";
+      RUNTIME.storeUi.page = 1;
+      renderStoreOverlay(RUNTIME.apps, loadSettings());
+    }
+    if (searchClear) {
+      searchClear.addEventListener("click", function () {
+        resetSearchFilter();
+      });
+    }
+    if (filterReset) {
+      filterReset.addEventListener("click", function () {
+        resetSearchFilter();
+      });
+    }
+    if (pagePrev) {
+      pagePrev.addEventListener("click", function () {
+        RUNTIME.storeUi.page = Math.max(1, Number(RUNTIME.storeUi.page || 1) - 1);
+        renderStoreOverlay(RUNTIME.apps, loadSettings());
+      });
+    }
+    if (pageNext) {
+      pageNext.addEventListener("click", function () {
+        RUNTIME.storeUi.page = Number(RUNTIME.storeUi.page || 1) + 1;
+        renderStoreOverlay(RUNTIME.apps, loadSettings());
       });
     }
     var authorLinks = overlay.querySelectorAll("[data-author-cmd]");
