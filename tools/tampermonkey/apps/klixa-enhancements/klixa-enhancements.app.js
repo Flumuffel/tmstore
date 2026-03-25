@@ -2,7 +2,7 @@
 @id klixa-enhancements
 @name Klixa Enhancements
 @author PHO
-@version 2.0.8
+@version 2.1.0
 @description Legacy Enhancements
 @status published
 @approved true
@@ -11,7 +11,113 @@
 @changelog Kürzeln in Online-Liste sortierbar
 @changelog Schwarze Balken in Online-Liste rot
 @changelog Gleitzeit-Gadget angepasst
+@changelog Profil-Button neben Schnellbefehl (#fast_cmd)
+@settings kuerzel string ""
 ==/TMStoreApp== */
+
+function tmStoreGetKlixaSettings() {
+    try {
+        if (typeof window.__TM_STORE_GET_APP_SETTINGS === "function") {
+            return window.__TM_STORE_GET_APP_SETTINGS("klixa-enhancements") || {};
+        }
+        if (window.__TM_STORE_CONTEXT && window.__TM_STORE_CONTEXT.appId === "klixa-enhancements") {
+            return window.__TM_STORE_CONTEXT.appSettings || {};
+        }
+    } catch (e) {}
+    return {};
+}
+
+function tmStoreDeriveKuerzelFromLoginText() {
+    try {
+        const txt = (document.body && (document.body.innerText || document.body.textContent)) ? String(document.body.innerText || document.body.textContent) : "";
+        const m = txt.match(/Eingeloggt\s+als:\s*([^\n\r]+)/i);
+        if (!m) return "";
+        const name = String(m[1] || "").trim();
+        if (!name) return "";
+        const parts = name.split(/\s+/).filter(Boolean);
+        if (parts.length < 2) return "";
+        const first = parts[0];
+        const last = parts[parts.length - 1];
+        const normalize = (s) =>
+            String(s || "")
+                .replace(/ü/g, "Ue").replace(/Ü/g, "UE")
+                .replace(/ö/g, "Oe").replace(/Ö/g, "OE")
+                .replace(/ä/g, "Ae").replace(/Ä/g, "AE")
+                .replace(/ß/g, "SS");
+        const f = normalize(first).charAt(0).toUpperCase();
+        const l = normalize(last).substring(0, 2).toUpperCase();
+        const code = (f + l).replace(/[^A-Z]/g, "");
+        return code.length >= 2 ? code : "";
+    } catch (e) {
+        return "";
+    }
+}
+
+function tmStoreGetProfileKuerzel() {
+    const s = tmStoreGetKlixaSettings();
+    const explicit = (s && s.kuerzel != null) ? String(s.kuerzel).trim() : "";
+    if (explicit) return explicit.toUpperCase();
+    return tmStoreDeriveKuerzelFromLoginText();
+}
+
+function tmStoreSendFastCmd(cmd) {
+    try {
+        const input = document.querySelector("#fast_cmd");
+        if (!input) return false;
+        input.focus();
+        input.value = cmd;
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+        input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true }));
+        input.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true }));
+        if (input.form && typeof input.form.requestSubmit === "function") {
+            input.form.requestSubmit();
+        } else if (input.form) {
+            input.form.submit();
+        }
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+function tmStoreEnsureProfileButton() {
+    try {
+        const form = document.querySelector("#fast_cmd_div > form");
+        const input = document.querySelector("#fast_cmd");
+        if (!form || !input) return;
+        if (form.querySelector("[data-tmstore-profile-btn='1']")) return;
+
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.setAttribute("data-tmstore-profile-btn", "1");
+        btn.title = "Zum eigenen Profil (a <Kürzel>)";
+        btn.textContent = "@";
+        btn.style.marginRight = "8px";
+        btn.style.padding = "6px 10px";
+        btn.style.borderRadius = "10px";
+        btn.style.border = "1px solid rgb(186, 215, 57)";
+        btn.style.background = "rgb(33, 37, 41)";
+        btn.style.color = "rgb(186, 215, 57)";
+        btn.style.cursor = "pointer";
+        btn.style.fontWeight = "800";
+        btn.style.lineHeight = "1";
+
+        btn.addEventListener("click", function () {
+            const kuerzel = tmStoreGetProfileKuerzel();
+            if (!kuerzel) return;
+            tmStoreSendFastCmd("a " + kuerzel);
+        });
+
+        form.insertBefore(btn, input);
+
+        // Wenn Settings/DOM später kommen, Tooltip dynamisch aktualisieren.
+        window.setTimeout(function () {
+            const k = tmStoreGetProfileKuerzel();
+            if (k) btn.title = "Zum eigenen Profil (a " + k + ")";
+        }, 800);
+    } catch (e) {}
+}
 
 // 1. Online-Benutzerliste anpassen
 const onlineElement = document.getElementById("online");
@@ -413,16 +519,23 @@ function tmStoreApplyKlixaDom(reason) {
 tmStoreApplyKlixaDom("init");
 window.addEventListener("tm-store-window-load", function () {
     tmStoreApplyKlixaDom("tm-store-window-load");
+    tmStoreEnsureProfileButton();
 });
 setTimeout(function () {
     tmStoreApplyKlixaDom("retry-200ms");
+    tmStoreEnsureProfileButton();
 }, 200);
 setTimeout(function () {
     tmStoreApplyKlixaDom("retry-800ms");
+    tmStoreEnsureProfileButton();
 }, 800);
 setTimeout(function () {
     tmStoreApplyKlixaDom("retry-2000ms");
+    tmStoreEnsureProfileButton();
 }, 2000);
+
+// Sofort versuchen (Cache-Start kann sehr früh sein)
+tmStoreEnsureProfileButton();
 
 // CSS-Anpassungen
 addGlobalStyle(/*css*/ `

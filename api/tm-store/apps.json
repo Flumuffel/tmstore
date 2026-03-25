@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-03-25T13:59:05+01:00",
+  "updatedAt": "2026-03-25T14:23:16+01:00",
   "source": {
     "type": "github",
     "repository": "https://github.com/Flumuffel/tmstore",
@@ -37,7 +37,7 @@
       "author": "PHO",
       "onDocumentLoad": false,
       "description": "Legacy Enhancements",
-      "version": "2.0.8",
+      "version": "2.0.9",
       "status": "published",
       "approved": true,
       "bundleUrl": "https://raw.githubusercontent.com/Flumuffel/tmstore/refs/heads/main/tools/tampermonkey/apps/klixa-enhancements/klixa-enhancements.app.js",
@@ -48,9 +48,16 @@
         "Darkmode wird ohne Buttons automatisch aktiviert",
         "Kürzeln in Online-Liste sortierbar",
         "Schwarze Balken in Online-Liste rot",
-        "Gleitzeit-Gadget angepasst"
+        "Gleitzeit-Gadget angepasst",
+        "Profil-Button neben Schnellbefehl (#fast_cmd)"
       ],
-      "settings": []
+      "settings": [
+        {
+          "key": "kuerzel",
+          "type": "string",
+          "default": ""
+        }
+      ]
     }
   ],
   "submissionQueue": []
