@@ -2,7 +2,7 @@
 @id glz-tracker
 @name GLZ Tracker
 @author PHO
-@version 1.0.4
+@version 1.0.5
 @description GLZ Live Tracker
 @status published
 @approved true
@@ -212,6 +212,9 @@ function todayStr() {
 
 function readGadgetValues() {
   let wazSoll = null, wazIst = null, wazDiff = null, glzSaldo = null;
+  let arbeitstageInWeek = null;
+  let workdaysFromTaz = 0;
+  let workdaysFromWazSoll = null;
   let loginTime = null, pauseTime = null, totStzMin = null;
   const today = todayStr();
 
@@ -232,6 +235,11 @@ function readGadgetValues() {
       }
       if (rowText.includes('WAZ soll') && !rowText.includes('diff')) {
         wazSoll = cells[cells.length - 1].textContent.trim();
+        const mWorkdays = String(wazSoll || "").match(/\/\s*(\d{1,2})/);
+        if (mWorkdays) {
+          const wd = parseInt(mWorkdays[1], 10);
+          if (!isNaN(wd) && wd > 0) workdaysFromWazSoll = wd;
+        }
       }
       if (rowText.includes('WAZ diff')) {
         wazDiff = cells[cells.length - 1].textContent.trim();
@@ -296,22 +304,46 @@ function readGadgetValues() {
           if (val !== null) totStzMin = val;
         }
       }
+
+      // Arbeitstage automatisch aus den "TAZ"-Zeilen ableiten:
+      // Wir zählen Tage in der Woche, bei denen die TAZ-soll-Zeit ungleich "0:00" ist.
+      // Tabellenheader: Dat | Stz | Tot Stz | Tot Rap | Verr Rap | TAZ | ΔTAZ soll
+      // => TAZ ist i.d.R. die vorletzte Spalte im Tages-Row.
+      if (cells[0]) {
+        const dateText = cells[0].textContent.trim();
+        if (/^\d{1,2}\.\d{2}$/.test(dateText) && cells.length >= 4) {
+          const tazIdx = cells.length - 2;
+          const tazText = cells[tazIdx] && cells[tazIdx].textContent ? cells[tazIdx].textContent.trim() : "";
+          const tazMins = parseTime(tazText);
+          if (tazMins !== null && tazMins !== 0) {
+            workdaysFromTaz += 1;
+          }
+        }
+      }
     }
   }
 
-  return { wazSoll, wazIst, wazDiff, glzSaldo, loginTime, pauseTime, totStzMin };
+  // Priorität: TAZ-Zählung (robuster), sonst WAZ-soll "/n" als Fallback.
+  if (workdaysFromTaz > 0) {
+    arbeitstageInWeek = workdaysFromTaz;
+  } else if (workdaysFromWazSoll && workdaysFromWazSoll > 0) {
+    arbeitstageInWeek = workdaysFromWazSoll;
+  }
+
+  return { wazSoll, wazIst, wazDiff, glzSaldo, loginTime, pauseTime, totStzMin, arbeitstageInWeek };
 }
 
 const state = {};
 
 function initState() {
-  const { wazSoll, wazIst, wazDiff, glzSaldo, loginTime, pauseTime, totStzMin } = readGadgetValues();
+  const { wazSoll, wazIst, wazDiff, glzSaldo, loginTime, pauseTime, totStzMin, arbeitstageInWeek } = readGadgetValues();
 
   state.totStzMin = totStzMin !== null ? totStzMin : 0;
   state.loadTime = new Date();
 
   const wazSollMin = parseTime(wazSoll);
-  state.tageSollMin = wazSollMin !== null ? Math.round(wazSollMin / 5) : (8 * 60 + 24);
+  const workdays = arbeitstageInWeek && arbeitstageInWeek > 0 ? arbeitstageInWeek : 5;
+  state.tageSollMin = wazSollMin !== null ? Math.round(wazSollMin / workdays) : (8 * 60 + 24);
 
   document.getElementById('glz-waz-ist').textContent = wazIst || '–';
   document.getElementById('glz-waz-soll').textContent = wazSoll || '–';
