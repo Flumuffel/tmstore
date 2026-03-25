@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Klixa TM Store Loader
 // @namespace    klixa.tm.store
-// @version      0.4.29
+// @version      0.4.30
 // @author LWE
 // @description  Loads approved Intranet apps from GitHub Raw manifest
 // @match        https://intranet.klixa.ch/*
@@ -567,6 +567,18 @@
       // eslint-disable-next-line no-new-func
       var execute = new Function(wrapped);
       execute();
+      try {
+        if (typeof window.CustomEvent === "function") {
+          window.dispatchEvent(
+            new CustomEvent("tm-store-app-settings-changed", {
+              detail: {
+                appId: app.id,
+                appSettings: getAppSettings(loadSettings(), app.id)
+              }
+            })
+          );
+        }
+      } catch (evtErr) {}
       logInfo("Loaded app " + app.id + "@" + app.version);
       return { ok: true, message: "Geladen" };
     } catch (err) {
@@ -1172,6 +1184,11 @@
       for (var f = 0; f < settingFields.length; f += 1) {
         settingFields[f].addEventListener("blur", function () {
           collectAndSaveSettings("focus-loss");
+        });
+        // Wichtig: Bei number/string wird oft kein blur ausgelöst (z.B. Overlay schließen),
+        // daher auch auf change speichern, damit es nach F5/Ctrl+F5 sofort korrekt ist.
+        settingFields[f].addEventListener("change", function () {
+          collectAndSaveSettings("change");
         });
       }
     }

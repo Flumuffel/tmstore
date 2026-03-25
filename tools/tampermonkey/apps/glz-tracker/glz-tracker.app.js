@@ -2,7 +2,7 @@
 @id glz-tracker
 @name GLZ Tracker
 @author PHO
-@version 1.1.0
+@version 1.1.1
 @description GLZ Live Tracker
 @status published
 @approved true
@@ -344,6 +344,15 @@ function initState() {
   }
 
   applyWorkdaysFromAppSettings(getGlzAppSettings());
+  // Race-Schutz beim Init: Settings kurz nach Start erneut ziehen.
+  window.setTimeout(function () {
+    applyWorkdaysFromAppSettings(getGlzAppSettings());
+    tick();
+  }, 200);
+  window.setTimeout(function () {
+    applyWorkdaysFromAppSettings(getGlzAppSettings());
+    tick();
+  }, 900);
 
   document.getElementById('glz-waz-ist').textContent = wazIst || '–';
   document.getElementById('glz-waz-soll').textContent = wazSoll || '–';
