@@ -2,7 +2,7 @@
 @id klixa-enhancements
 @name Klixa Enhancements
 @author PHO
-@version 2.1.0
+@version 2.1.1
 @description Legacy Enhancements
 @status published
 @approved true
@@ -62,19 +62,31 @@ function tmStoreGetProfileKuerzel() {
 
 function tmStoreSendFastCmd(cmd) {
     try {
-        const input = document.querySelector("#fast_cmd");
-        if (!input) return false;
-        input.focus();
-        input.value = cmd;
-        input.dispatchEvent(new Event("input", { bubbles: true }));
-        input.dispatchEvent(new Event("change", { bubbles: true }));
-        input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true }));
-        input.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true }));
-        if (input.form && typeof input.form.requestSubmit === "function") {
-            input.form.requestSubmit();
-        } else if (input.form) {
-            input.form.submit();
-        }
+        let tries = 0;
+        const maxTries = 25; // wie im Store-@author Verhalten
+        const timer = window.setInterval(function () {
+            tries += 1;
+            const input = document.querySelector("#fast_cmd");
+            if (!input) {
+                if (tries >= maxTries) window.clearInterval(timer);
+                return;
+            }
+
+            input.focus();
+            input.value = cmd;
+            input.dispatchEvent(new Event("input", { bubbles: true }));
+            input.dispatchEvent(new Event("change", { bubbles: true }));
+            input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true }));
+            input.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true }));
+
+            if (input.form && typeof input.form.requestSubmit === "function") {
+                input.form.requestSubmit();
+            } else if (input.form) {
+                input.form.submit();
+            }
+
+            window.clearInterval(timer);
+        }, 350);
         return true;
     } catch (e) {
         return false;
@@ -91,8 +103,9 @@ function tmStoreEnsureProfileButton() {
         const btn = document.createElement("button");
         btn.type = "button";
         btn.setAttribute("data-tmstore-profile-btn", "1");
-        btn.title = "Zum eigenen Profil (a <Kürzel>)";
-        btn.textContent = "@";
+        const initialK = tmStoreGetProfileKuerzel();
+        btn.title = initialK ? ("Zum eigenen Profil (a " + initialK + ")") : "Zum eigenen Profil (a <Kürzel>)";
+        btn.textContent = initialK ? ("@" + initialK) : "@";
         btn.style.marginRight = "8px";
         btn.style.padding = "6px 10px";
         btn.style.borderRadius = "10px";
@@ -106,6 +119,8 @@ function tmStoreEnsureProfileButton() {
         btn.addEventListener("click", function () {
             const kuerzel = tmStoreGetProfileKuerzel();
             if (!kuerzel) return;
+            btn.title = "Zum eigenen Profil (a " + kuerzel + ")";
+            btn.textContent = "@" + kuerzel;
             tmStoreSendFastCmd("a " + kuerzel);
         });
 
@@ -114,7 +129,10 @@ function tmStoreEnsureProfileButton() {
         // Wenn Settings/DOM später kommen, Tooltip dynamisch aktualisieren.
         window.setTimeout(function () {
             const k = tmStoreGetProfileKuerzel();
-            if (k) btn.title = "Zum eigenen Profil (a " + k + ")";
+            if (k) {
+                btn.title = "Zum eigenen Profil (a " + k + ")";
+                btn.textContent = "@" + k;
+            }
         }, 800);
     } catch (e) {}
 }
