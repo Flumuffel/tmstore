@@ -2,7 +2,7 @@
 @id klixa-enhancements
 @name Klixa Enhancements
 @author PHO
-@version 2.1.1
+@version 2.1.2
 @description Legacy Enhancements
 @status published
 @approved true
@@ -29,10 +29,18 @@ function tmStoreGetKlixaSettings() {
 
 function tmStoreDeriveKuerzelFromLoginText() {
     try {
-        const txt = (document.body && (document.body.innerText || document.body.textContent)) ? String(document.body.innerText || document.body.textContent) : "";
+        // Möglichst gezielt aus Footer lesen (ist zuverlässiger als body.innerText).
+        const footer = document.querySelector(".footer_bar") || document.querySelector(".footer_icons") || null;
+        const footerTxt = footer ? String(footer.innerText || footer.textContent || "") : "";
+        const bodyTxt = (document.body && (document.body.innerText || document.body.textContent))
+            ? String(document.body.innerText || document.body.textContent)
+            : "";
+        const txt = (footerTxt && footerTxt.length > 10) ? footerTxt : bodyTxt;
+
         const m = txt.match(/Eingeloggt\s+als:\s*([^\n\r]+)/i);
         if (!m) return "";
-        const name = String(m[1] || "").trim();
+        // Oft hängt hinten noch (intern/...) dran -> abschneiden.
+        const name = String(m[1] || "").replace(/\(.*?\)\s*$/, "").trim();
         if (!name) return "";
         const parts = name.split(/\s+/).filter(Boolean);
         if (parts.length < 2) return "";
@@ -93,19 +101,51 @@ function tmStoreSendFastCmd(cmd) {
     }
 }
 
+function tmStoreUpdateProfileBtnLabel(btnEl) {
+    try {
+        const k = tmStoreGetProfileKuerzel();
+        if (k) {
+            btnEl.title = "Zum eigenen Profil (a " + k + ")";
+            btnEl.textContent = "@" + k;
+        } else {
+            btnEl.title = "Zum eigenen Profil (a <Kürzel>)";
+            btnEl.textContent = "@";
+        }
+    } catch (e) {}
+}
+
+function tmStoreSendProfileCmdWithRetry() {
+    try {
+        let tries = 0;
+        const maxTries = 25;
+        const timer = window.setInterval(function () {
+            tries += 1;
+            const kuerzel = tmStoreGetProfileKuerzel();
+            if (kuerzel) {
+                tmStoreSendFastCmd("a " + kuerzel);
+                window.clearInterval(timer);
+                return;
+            }
+            if (tries >= maxTries) window.clearInterval(timer);
+        }, 250);
+    } catch (e) {}
+}
+
 function tmStoreEnsureProfileButton() {
     try {
         const form = document.querySelector("#fast_cmd_div > form");
         const input = document.querySelector("#fast_cmd");
         if (!form || !input) return;
-        if (form.querySelector("[data-tmstore-profile-btn='1']")) return;
+        const existing = form.querySelector("[data-tmstore-profile-btn='1']");
+        if (existing) {
+            tmStoreUpdateProfileBtnLabel(existing);
+            return;
+        }
 
         const btn = document.createElement("button");
         btn.type = "button";
         btn.setAttribute("data-tmstore-profile-btn", "1");
-        const initialK = tmStoreGetProfileKuerzel();
-        btn.title = initialK ? ("Zum eigenen Profil (a " + initialK + ")") : "Zum eigenen Profil (a <Kürzel>)";
-        btn.textContent = initialK ? ("@" + initialK) : "@";
+        tmStoreUpdateProfileBtnLabel(btn);
         btn.style.marginRight = "8px";
         btn.style.padding = "6px 10px";
         btn.style.borderRadius = "10px";
@@ -117,23 +157,26 @@ function tmStoreEnsureProfileButton() {
         btn.style.lineHeight = "1";
 
         btn.addEventListener("click", function () {
-            const kuerzel = tmStoreGetProfileKuerzel();
-            if (!kuerzel) return;
-            btn.title = "Zum eigenen Profil (a " + kuerzel + ")";
-            btn.textContent = "@" + kuerzel;
-            tmStoreSendFastCmd("a " + kuerzel);
+            tmStoreUpdateProfileBtnLabel(btn);
+            tmStoreSendProfileCmdWithRetry();
         });
 
         form.insertBefore(btn, input);
 
-        // Wenn Settings/DOM später kommen, Tooltip dynamisch aktualisieren.
-        window.setTimeout(function () {
-            const k = tmStoreGetProfileKuerzel();
-            if (k) {
-                btn.title = "Zum eigenen Profil (a " + k + ")";
-                btn.textContent = "@" + k;
+        // Wenn Settings/DOM später kommen, Label/Tooltip dynamisch aktualisieren.
+        window.setTimeout(function () { tmStoreUpdateProfileBtnLabel(btn); }, 800);
+        window.setTimeout(function () { tmStoreUpdateProfileBtnLabel(btn); }, 2000);
+
+        // Footer kann später aktualisieren -> beobachten und dann updaten.
+        try {
+            const footer = document.querySelector(".footer_bar") || null;
+            if (footer && typeof MutationObserver === "function") {
+                const obs = new MutationObserver(function () {
+                    tmStoreUpdateProfileBtnLabel(btn);
+                });
+                obs.observe(footer, { childList: true, subtree: true, characterData: true });
             }
-        }, 800);
+        } catch (e) {}
     } catch (e) {}
 }
 
