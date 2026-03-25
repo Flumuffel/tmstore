@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Klixa TM Store Loader
 // @namespace    klixa.tm.store
-// @version      0.4.31
+// @version      0.4.32
 // @author LWE
 // @description  Loads approved Intranet apps from GitHub Raw manifest
 // @match        https://intranet.klixa.ch/*
@@ -41,6 +41,8 @@
   var REPO_URL = "https://github.com/" + GITHUB_OWNER + "/" + GITHUB_REPO;
   var CACHE_KEY = "tm_store_cache_v1_" + GITHUB_OWNER + "_" + GITHUB_REPO + "_" + GITHUB_REF;
   var SETTINGS_KEY = "tm_store_settings_v1";
+  var APP_BUNDLE_CACHE_PREFIX = "tm_store_app_bundle_cache_v1:";
+  var APP_CSS_CACHE_PREFIX = "tm_store_app_css_cache_v1:";
   var UPDATE_CHECK_KEY = "tm_store_loader_update_check_v1";
   var UPDATE_ACK_KEY = "tm_store_loader_update_ack_v1";
   var AUTHOR_CMD_STATE_KEY = "tm_store_author_cmd_state_v1";
@@ -253,6 +255,65 @@
         }
       });
     });
+  }
+
+  function loadAppBundleCache(appId) {
+    try {
+      var raw = GM_getValue(APP_BUNDLE_CACHE_PREFIX + String(appId || ""), "");
+      if (!raw) return null;
+      return safeParse(raw, null);
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function saveAppBundleCache(appId, payload) {
+    try {
+      GM_setValue(APP_BUNDLE_CACHE_PREFIX + String(appId || ""), JSON.stringify(payload || {}));
+    } catch (err) {}
+  }
+
+  function loadAppCssCache(appId) {
+    try {
+      var raw = GM_getValue(APP_CSS_CACHE_PREFIX + String(appId || ""), "");
+      if (!raw) return null;
+      return safeParse(raw, null);
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function saveAppCssCache(appId, payload) {
+    try {
+      GM_setValue(APP_CSS_CACHE_PREFIX + String(appId || ""), JSON.stringify(payload || {}));
+    } catch (err) {}
+  }
+
+  function runAppCode(app, code) {
+    window.__TM_STORE_DEBUG = {
+      log: function (scope, message, data) {
+        addLog("info", scope || ("app:" + app.id), message || "", data || null);
+      },
+      error: function (scope, message, data) {
+        addLog("error", scope || ("app:" + app.id), message || "", data || null);
+      }
+    };
+    window.__TM_STORE_CONTEXT = {
+      appId: app.id,
+      appVersion: app.version,
+      settingsKey: SETTINGS_KEY,
+      repository: REPO_URL,
+      cssInjectedByLoader: !!RUNTIME.loadedCss[app.id],
+      appSettings: getAppSettings(loadSettings(), app.id)
+    };
+    window.__TM_STORE_GET_APP_SETTINGS = function (id) {
+      return getAppSettings(loadSettings(), id || app.id);
+    };
+    var wrapped = "(function(window, document){\n" + code + "\n})(window, document);";
+    // Controlled app execution scope for bundled apps.
+    // eslint-disable-next-line no-new-func
+    var execute = new Function(wrapped);
+    execute();
   }
 
   function loadSettings() {
@@ -501,16 +562,23 @@
       if (!RUNTIME.loadedCss[app.id]) {
         try {
           addLog("info", "app:" + app.id, "Lade App-CSS", { url: app.cssUrl });
-          var cssFetchUrl = app.cssUrl;
-          // Fix: App-CSS wird oft gecached; Cache-Buster stellt sicher,
-          // dass wir die aktuelle App-Version laden (insb. nach Änderungen).
-          cssFetchUrl +=
-            (cssFetchUrl.indexOf("?") >= 0 ? "&" : "?") +
-            "t=" +
-            now() +
-            "&v=" +
-            encodeURIComponent(app.version || app.id);
-          var cssText = await gmRequestText(cssFetchUrl);
+          var cssText = null;
+          var cssCache = loadAppCssCache(app.id);
+          if (cssCache && cssCache.version === app.version && typeof cssCache.css === "string" && cssCache.css.length) {
+            cssText = cssCache.css;
+            addLog("info", "app:" + app.id, "App-CSS aus Cache", { bytes: cssText.length, version: app.version });
+          } else {
+            var cssFetchUrl = app.cssUrl;
+            cssFetchUrl +=
+              (cssFetchUrl.indexOf("?") >= 0 ? "&" : "?") +
+              "t=" +
+              now() +
+              "&v=" +
+              encodeURIComponent(app.version || app.id);
+            cssText = await gmRequestText(cssFetchUrl);
+            saveAppCssCache(app.id, { version: app.version, css: cssText, at: now() });
+            addLog("info", "app:" + app.id, "App-CSS in Cache gespeichert", { bytes: cssText.length, version: app.version });
+          }
           GM_addStyle(cssText);
           RUNTIME.loadedCss[app.id] = true;
           addLog("info", "app:" + app.id, "App-CSS injiziert", { bytes: cssText.length });
@@ -526,15 +594,24 @@
     }
 
     addLog("info", "app:" + app.id, "Lade App-Bundle", { url: app.bundleUrl, version: app.version });
-    var bundleFetchUrl = app.bundleUrl;
-    // Fix: App-Bundle wird ebenfalls gecached; Cache-Buster sorgt für F5/Ctrl+F5 Konsistenz.
-    bundleFetchUrl +=
-      (bundleFetchUrl.indexOf("?") >= 0 ? "&" : "?") +
-      "t=" +
-      now() +
-      "&v=" +
-      encodeURIComponent(app.version || app.id);
-    var code = await gmRequestText(bundleFetchUrl);
+    var code = null;
+    var cache = loadAppBundleCache(app.id);
+    if (cache && cache.version === app.version && typeof cache.code === "string" && cache.code.length) {
+      code = cache.code;
+      addLog("info", "app:" + app.id, "App-Bundle aus Cache", { bytes: code.length, version: app.version });
+    } else {
+      var bundleFetchUrl = app.bundleUrl;
+      // Cache-Buster nur beim echten Network-Fetch.
+      bundleFetchUrl +=
+        (bundleFetchUrl.indexOf("?") >= 0 ? "&" : "?") +
+        "t=" +
+        now() +
+        "&v=" +
+        encodeURIComponent(app.version || app.id);
+      code = await gmRequestText(bundleFetchUrl);
+      saveAppBundleCache(app.id, { version: app.version, code: code, at: now() });
+      addLog("info", "app:" + app.id, "App-Bundle in Cache gespeichert", { bytes: code.length, version: app.version });
+    }
     if (app.sha256) {
       var hash = await sha256Hex(code);
       if (!hash || !equalsIgnoreCase(hash, app.sha256)) {
@@ -542,31 +619,8 @@
         throw new Error("SHA256 mismatch for " + app.id);
       }
     }
-    window.__TM_STORE_DEBUG = {
-      log: function (scope, message, data) {
-        addLog("info", scope || ("app:" + app.id), message || "", data || null);
-      },
-      error: function (scope, message, data) {
-        addLog("error", scope || ("app:" + app.id), message || "", data || null);
-      }
-    };
-    window.__TM_STORE_CONTEXT = {
-      appId: app.id,
-      appVersion: app.version,
-      settingsKey: SETTINGS_KEY,
-      repository: REPO_URL,
-      cssInjectedByLoader: !!RUNTIME.loadedCss[app.id],
-      appSettings: getAppSettings(loadSettings(), app.id)
-    };
-    window.__TM_STORE_GET_APP_SETTINGS = function (id) {
-      return getAppSettings(loadSettings(), id || app.id);
-    };
-    var wrapped = "(function(window, document){\n" + code + "\n})(window, document);";
     try {
-      // Controlled app execution scope for bundled apps.
-      // eslint-disable-next-line no-new-func
-      var execute = new Function(wrapped);
-      execute();
+      runAppCode(app, code);
       try {
         if (typeof window.CustomEvent === "function") {
           window.dispatchEvent(
