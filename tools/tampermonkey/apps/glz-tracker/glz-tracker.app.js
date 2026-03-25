@@ -2,7 +2,7 @@
 @id glz-tracker
 @name GLZ Tracker
 @author PHO
-@version 1.0.0
+@version 1.0.1
 @description GLZ Live Tracker
 @status published
 @approved true
@@ -240,7 +240,9 @@
             glzSaldo = cells[cells.length - 1].textContent.trim();
           }
   
-          if (cells[0] && cells[0].textContent.trim() === today && cells.length >= 9) {
+          // "Heute"-Zeile ist in der GLZ-Tracker-Tabelle häufig nicht immer gleich breit,
+          // daher nicht zu streng auf die Anzahl der <td> prüfen.
+          if (cells[0] && cells[0].textContent.trim() === today && cells.length >= 3) {
             if (cells[1]) {
               const m = cells[1].innerHTML.match(/(\d{1,2}:\d{2})/);
               if (m && !loginTime) loginTime = m[1];
@@ -263,8 +265,36 @@
             }
   
             const totStzIdx = cells.length - 5;
-            const val = parseTime(cells[totStzIdx].textContent.trim());
-            if (val !== null) totStzMin = val;
+            var totText = cells[totStzIdx] && cells[totStzIdx].textContent ? cells[totStzIdx].textContent.trim() : "";
+            // In manchen Status-Ansichten steht in "Tot Stz" statt einer Uhrzeit einfach "jetzt".
+            // Dann berechnen wir "Tot Stz" live aus Login-Zeit minus Pausen (falls berechnet).
+            if (totText.toLowerCase().indexOf("jetzt") !== -1) {
+              if (loginTime) {
+                var tM = loginTime.match(/(\d{1,2}):(\d{2})/);
+                if (tM) {
+                  var loginMins = parseInt(tM[1], 10) * 60 + parseInt(tM[2], 10);
+                  var now = new Date();
+                  var nowMins = now.getHours() * 60 + now.getMinutes();
+                  // Falls die Login-Zeit z.B. kurz nach Mitternacht liegt.
+                  if (loginMins > nowMins) loginMins -= 1440;
+
+                  var pauseMins = 0;
+                  if (pauseTime) {
+                    // pauseTime ist z.B. "1:05 h"
+                    var pm = String(pauseTime).match(/(\d+):(\d{2})\s*h/);
+                    if (pm) {
+                      pauseMins = parseInt(pm[1], 10) * 60 + parseInt(pm[2], 10);
+                    }
+                  }
+
+                  var elapsed = nowMins - loginMins - pauseMins;
+                  if (!isNaN(elapsed)) totStzMin = elapsed;
+                }
+              }
+            } else {
+              const val = parseTime(totText);
+              if (val !== null) totStzMin = val;
+            }
           }
         }
       }
