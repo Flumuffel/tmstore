@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Klixa TM Store Loader
 // @namespace    klixa.tm.store
-// @version      0.4.28
+// @version      0.4.29
 // @author LWE
 // @description  Loads approved Intranet apps from GitHub Raw manifest
 // @match        https://intranet.klixa.ch/*
@@ -1018,6 +1018,20 @@
         next.appSettings[app.id] = current;
       }
       saveSettingsWithToast(next, reason || "manual");
+      // Apps informieren, damit sie ihre App-Settings ohne Reload neu berechnen können.
+      try {
+        for (var n = 0; n < published.length; n += 1) {
+          var pApp = published[n];
+          var pSettings = (next.appSettings && next.appSettings[pApp.id]) ? next.appSettings[pApp.id] : {};
+          if (typeof window.CustomEvent === "function") {
+            window.dispatchEvent(
+              new CustomEvent("tm-store-app-settings-changed", {
+                detail: { appId: pApp.id, appSettings: pSettings }
+              })
+            );
+          }
+        }
+      } catch (evtErr) {}
       return next;
     }
     function setPageView(mode) {

@@ -72,11 +72,18 @@ const STYLE = `
         height: 100%; border-radius: 3px; background: rgb(221, 54, 25);
         transition: width 1s linear; max-width: 100%;
       }
+      .glz-version {
+        font-size: 10px;
+        opacity: 0.85;
+        color: rgb(173,181,189);
+        margin-left: 6px;
+        font-weight: 600;
+      }
     `;
 
 const HTML = `
       <div id="glz-tracker">
-        <h4 id="glz-drag-handle"><span class="glz-live-dot"></span>GLZ Tracker</h4>
+        <h4 id="glz-drag-handle"><span class="glz-live-dot"></span>GLZ Tracker <span id="glz-app-version" class="glz-version"></span></h4>
   
         <div class="glz-section-label">Woche</div>
         <div class="glz-row">
@@ -313,16 +320,22 @@ function initState() {
   state.loadTime = new Date();
 
   const wazSollMin = parseTime(wazSoll);
+  state.wazSollMin = wazSollMin;
   // App-spezifisches Setting: Arbeitstage pro Woche (1..5)
+  function applyWorkdaysFromAppSettings(appSettings) {
+    var cfg = Number(appSettings && appSettings.arbeitstage != null ? appSettings.arbeitstage : 5);
+    if (!cfg || isNaN(cfg)) cfg = 5;
+    var workdays = Math.max(1, Math.min(5, Math.floor(cfg)));
+    state.tageSollMin = state.wazSollMin !== null ? Math.round(state.wazSollMin / workdays) : (8 * 60 + 24);
+    document.getElementById('glz-taz-soll').textContent = formatMins(state.tageSollMin);
+  }
+
   var appSettings = (window.__TM_STORE_CONTEXT && window.__TM_STORE_CONTEXT.appSettings) ? window.__TM_STORE_CONTEXT.appSettings : {};
-  var cfg = Number(appSettings && appSettings.arbeitstage != null ? appSettings.arbeitstage : 5);
-  if (!cfg || isNaN(cfg)) cfg = 5;
-  var workdays = Math.max(1, Math.min(5, Math.floor(cfg)));
-  state.tageSollMin = wazSollMin !== null ? Math.round(wazSollMin / workdays) : (8 * 60 + 24);
+  applyWorkdaysFromAppSettings(appSettings);
 
   document.getElementById('glz-waz-ist').textContent = wazIst || '–';
   document.getElementById('glz-waz-soll').textContent = wazSoll || '–';
-  document.getElementById('glz-taz-soll').textContent = formatMins(state.tageSollMin);
+  // Glz-Taz soll wird oben in applyWorkdaysFromAppSettings gesetzt.
 
   if (wazDiff) {
     const el = document.getElementById('glz-waz-diff');
@@ -340,6 +353,25 @@ function initState() {
 
   document.getElementById('glz-login-time').textContent = loginTime ? loginTime + ' Uhr' : '–';
   document.getElementById('glz-pause-time').textContent = pauseTime || 'keine';
+
+  // App-Version anzeigen (aus Loader-Kontext).
+  var vEl = document.getElementById('glz-app-version');
+  if (vEl && window.__TM_STORE_CONTEXT && window.__TM_STORE_CONTEXT.appVersion) {
+    vEl.textContent = "v" + String(window.__TM_STORE_CONTEXT.appVersion);
+  }
+
+  // Bei App-Settings-Änderungen neu berechnen.
+  if (!state._settingsListenerAdded) {
+    state._settingsListenerAdded = true;
+    window.addEventListener("tm-store-app-settings-changed", function (evt) {
+      try {
+        var detail = evt && evt.detail ? evt.detail : null;
+        if (!detail || detail.appId !== "glz-tracker") return;
+        applyWorkdaysFromAppSettings(detail.appSettings || {});
+        tick();
+      } catch (e) {}
+    });
+  }
 }
 
 function tick() {
