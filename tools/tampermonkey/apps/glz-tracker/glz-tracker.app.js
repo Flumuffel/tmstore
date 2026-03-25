@@ -2,7 +2,7 @@
 @id glz-tracker
 @name GLZ Tracker
 @author PHO
-@version 1.0.5
+@version 1.0.6
 @description GLZ Live Tracker
 @status published
 @approved true
@@ -124,6 +124,10 @@ const HTML = `
           <span>Pause</span>
           <span id="glz-pause-time">–</span>
         </div>
+        <div class="glz-row" style="font-size:11px; color: rgb(173,181,189);">
+          <span>Erkannte Arbeitstage</span>
+          <span id="glz-workdays-debug">–</span>
+        </div>
       </div>
     `;
 
@@ -215,6 +219,7 @@ function readGadgetValues() {
   let arbeitstageInWeek = null;
   let workdaysFromTaz = 0;
   let workdaysFromWazSoll = null;
+  let arbeitstageSource = null;
   let loginTime = null, pauseTime = null, totStzMin = null;
   const today = todayStr();
 
@@ -326,17 +331,39 @@ function readGadgetValues() {
   // Priorität: TAZ-Zählung (robuster), sonst WAZ-soll "/n" als Fallback.
   if (workdaysFromTaz > 0) {
     arbeitstageInWeek = workdaysFromTaz;
+    arbeitstageSource = "TAZ";
   } else if (workdaysFromWazSoll && workdaysFromWazSoll > 0) {
     arbeitstageInWeek = workdaysFromWazSoll;
+    arbeitstageSource = "WAZ_soll";
   }
 
-  return { wazSoll, wazIst, wazDiff, glzSaldo, loginTime, pauseTime, totStzMin, arbeitstageInWeek };
+  return {
+    wazSoll,
+    wazIst,
+    wazDiff,
+    glzSaldo,
+    loginTime,
+    pauseTime,
+    totStzMin,
+    arbeitstageInWeek,
+    arbeitstageSource,
+  };
 }
 
 const state = {};
 
 function initState() {
-  const { wazSoll, wazIst, wazDiff, glzSaldo, loginTime, pauseTime, totStzMin, arbeitstageInWeek } = readGadgetValues();
+  const {
+    wazSoll,
+    wazIst,
+    wazDiff,
+    glzSaldo,
+    loginTime,
+    pauseTime,
+    totStzMin,
+    arbeitstageInWeek,
+    arbeitstageSource,
+  } = readGadgetValues();
 
   state.totStzMin = totStzMin !== null ? totStzMin : 0;
   state.loadTime = new Date();
@@ -365,6 +392,11 @@ function initState() {
 
   document.getElementById('glz-login-time').textContent = loginTime ? loginTime + ' Uhr' : '–';
   document.getElementById('glz-pause-time').textContent = pauseTime || 'keine';
+  var workdaysEl = document.getElementById('glz-workdays-debug');
+  if (workdaysEl) {
+    var src = arbeitstageSource ? String(arbeitstageSource) : "FALLBACK";
+    workdaysEl.textContent = workdays + " (" + src + ")";
+  }
 }
 
 function tick() {
