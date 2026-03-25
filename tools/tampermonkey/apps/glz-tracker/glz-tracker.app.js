@@ -2,7 +2,7 @@
 @id glz-tracker
 @name GLZ Tracker
 @author PHO
-@version 1.1.4
+@version 1.1.6
 @description GLZ Live Tracker
 @status published
 @approved true
@@ -196,6 +196,40 @@ function parseTime(str) {
   return neg ? -mins : mins;
 }
 
+function convertDecimalToTime(decimal) {
+  const abs = Math.abs(decimal);
+  var h = Math.floor(abs);
+  var m = Math.round((abs - h) * 60);
+  if (m >= 60) {
+    m -= 60;
+    h += 1;
+  }
+  const mm = String(m).padStart(2, '0');
+  return (decimal < 0 ? '-' : '') + h + ':' + mm;
+}
+
+function convertTimesInElement(parentElement) {
+  // Konvertiert z.B. "8.58 h" -> "8:35" in TDs, falls die Seite statt Uhrzeiten nur Dezimalwerte zeigt.
+  // Wichtig: Wir verändern nichts, wenn bereits ":" enthalten ist.
+  try {
+    if (!parentElement || !parentElement.querySelectorAll) return;
+    var tds = parentElement.querySelectorAll('td');
+    for (var i = 0; i < tds.length; i += 1) {
+      var td = tds[i];
+      if (!td) continue;
+      var txt = td.textContent ? String(td.textContent).trim() : "";
+      if (!txt) continue;
+      if (txt.indexOf(':') !== -1) continue;
+      var m = txt.match(/(-?\d+(?:\.\d+)?)\s*h/);
+      if (!m) continue;
+      var val = parseFloat(m[1]);
+      if (isNaN(val)) continue;
+      var converted = convertDecimalToTime(val);
+      td.textContent = txt.replace(m[0], converted);
+    }
+  } catch (e) {}
+}
+
 function formatSecs(totalSecs) {
   const abs = Math.abs(totalSecs);
   const h = Math.floor(abs / 3600);
@@ -227,6 +261,10 @@ function readGadgetValues() {
   for (const gadget of gadgets) {
     const title = gadget.querySelector('.gadget_title');
     if (!title || !title.textContent.includes('Tagesarbeitszeit')) continue;
+
+    // Damit wir unabhängig von "klixa-enhancements" arbeiten können:
+    // Wenn die Seite Dezimalstunden anstatt Uhrzeiten zeigt, konvertieren wir hier.
+    convertTimesInElement(gadget);
 
     const rows = gadget.querySelectorAll('tr');
 

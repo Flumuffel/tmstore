@@ -2,7 +2,7 @@
 @id klixa-enhancements
 @name Klixa Enhancements
 @author PHO
-@version 2.1.2
+@version 2.1.3
 @description Legacy Enhancements
 @status published
 @approved true
@@ -597,6 +597,15 @@ setTimeout(function () {
 
 // Sofort versuchen (Cache-Start kann sehr früh sein)
 tmStoreEnsureProfileButton();
+
+// Wenn der Nutzer im Store die App-Settings ändert, Label/Tooltip sofort nachziehen.
+window.addEventListener("tm-store-app-settings-changed", function (evt) {
+    try {
+        var detail = evt && evt.detail ? evt.detail : null;
+        if (!detail || detail.appId !== "klixa-enhancements") return;
+        tmStoreEnsureProfileButton();
+    } catch (e) {}
+});
 
 // CSS-Anpassungen
 addGlobalStyle(/*css*/ `
