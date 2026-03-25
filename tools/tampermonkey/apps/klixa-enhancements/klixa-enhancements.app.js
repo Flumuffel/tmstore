@@ -2,7 +2,7 @@
 @id klixa-enhancements
 @name Klixa Enhancements
 @author PHO
-@version 2.0.6
+@version 2.0.7
 @description Legacy Enhancements
 @status published
 @approved true
@@ -152,7 +152,6 @@ td #rm_bg,
 td#rt,
 td#mt,
 td#lt,
-td#tpl,
 td #lm_bg,
 td#lb,
 td#mb,
@@ -194,6 +193,10 @@ input[type=submit], input[type=reset],
     background: none;
     background-color: rgb(52, 58, 64);
     color: rgb(222, 226, 230) !important;
+}
+
+td#tpl {
+    background: none !important;
 }
 
 #tab li span,
