@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Klixa TM Store Loader
 // @namespace    klixa.tm.store
-// @version      0.4.26
+// @version      0.4.27
 // @author LWE
 // @description  Loads approved Intranet apps from GitHub Raw manifest
 // @match        https://intranet.klixa.ch/*
@@ -501,7 +501,16 @@
       if (!RUNTIME.loadedCss[app.id]) {
         try {
           addLog("info", "app:" + app.id, "Lade App-CSS", { url: app.cssUrl });
-          var cssText = await gmRequestText(app.cssUrl);
+          var cssFetchUrl = app.cssUrl;
+          // Fix: App-CSS wird oft gecached; Cache-Buster stellt sicher,
+          // dass wir die aktuelle App-Version laden (insb. nach Änderungen).
+          cssFetchUrl +=
+            (cssFetchUrl.indexOf("?") >= 0 ? "&" : "?") +
+            "t=" +
+            now() +
+            "&v=" +
+            encodeURIComponent(app.version || app.id);
+          var cssText = await gmRequestText(cssFetchUrl);
           GM_addStyle(cssText);
           RUNTIME.loadedCss[app.id] = true;
           addLog("info", "app:" + app.id, "App-CSS injiziert", { bytes: cssText.length });
@@ -517,7 +526,15 @@
     }
 
     addLog("info", "app:" + app.id, "Lade App-Bundle", { url: app.bundleUrl, version: app.version });
-    var code = await gmRequestText(app.bundleUrl);
+    var bundleFetchUrl = app.bundleUrl;
+    // Fix: App-Bundle wird ebenfalls gecached; Cache-Buster sorgt für F5/Ctrl+F5 Konsistenz.
+    bundleFetchUrl +=
+      (bundleFetchUrl.indexOf("?") >= 0 ? "&" : "?") +
+      "t=" +
+      now() +
+      "&v=" +
+      encodeURIComponent(app.version || app.id);
+    var code = await gmRequestText(bundleFetchUrl);
     if (app.sha256) {
       var hash = await sha256Hex(code);
       if (!hash || !equalsIgnoreCase(hash, app.sha256)) {

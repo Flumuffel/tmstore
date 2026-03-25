@@ -2,7 +2,7 @@
 @id glz-tracker
 @name GLZ Tracker
 @author PHO
-@version 1.0.6
+@version 1.0.7
 @description GLZ Live Tracker
 @status published
 @approved true
@@ -311,14 +311,15 @@ function readGadgetValues() {
       }
 
       // Arbeitstage automatisch aus den "TAZ"-Zeilen ableiten:
-      // Wir zählen Tage in der Woche, bei denen die TAZ-soll-Zeit ungleich "0:00" ist.
-      // Tabellenheader: Dat | Stz | Tot Stz | Tot Rap | Verr Rap | TAZ | ΔTAZ soll
-      // => TAZ ist i.d.R. die vorletzte Spalte im Tages-Row.
-      if (cells[0]) {
-        const dateText = cells[0].textContent.trim();
-        if (/^\d{1,2}\.\d{2}$/.test(dateText) && cells.length >= 4) {
-          const tazIdx = cells.length - 2;
-          const tazText = cells[tazIdx] && cells[tazIdx].textContent ? cells[tazIdx].textContent.trim() : "";
+      // WICHTIG: Wir müssen direkte "tr > td"-Zellen nehmen, weil in "Stz" verschachtelte Tabellen
+      // sonst die Indizes von querySelectorAll('td') verschieben können.
+      var directTds = row && row.querySelectorAll ? row.querySelectorAll(":scope > td") : null;
+      if (directTds && directTds.length >= 2) {
+        const dateText = (directTds[0] && directTds[0].textContent ? directTds[0].textContent.trim() : "");
+        if (/^\d{1,2}\.\d{2}$/.test(dateText)) {
+          const tazIdx = directTds.length - 2; // vorletzte direkte Spalte
+          const tazText =
+            directTds[tazIdx] && directTds[tazIdx].textContent ? directTds[tazIdx].textContent.trim() : "";
           const tazMins = parseTime(tazText);
           if (tazMins !== null && tazMins !== 0) {
             workdaysFromTaz += 1;
