@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Klixa TM Store Loader
 // @namespace    klixa.tm.store
-// @version      0.4.32
+// @version      0.4.33
 // @author LWE
 // @description  Loads approved Intranet apps from GitHub Raw manifest
 // @match        https://intranet.klixa.ch/*
@@ -1730,6 +1730,24 @@
   async function boot() {
     RUNTIME.loaderUpdate = normalizeUpdateStateWithLocalVersion(loadUpdateState());
     startPeriodicUpdateChecks();
+    // Globales Event für Apps, die nach "window.load" DOM-abhängig nachziehen wollen.
+    (function () {
+      function fire() {
+        try {
+          if (typeof window.CustomEvent === "function") {
+            window.dispatchEvent(new CustomEvent("tm-store-window-load", { detail: { at: now() } }));
+          }
+        } catch (e) {}
+      }
+      if (document.readyState === "complete") {
+        // Loader kann nach window.load starten (Cache). Dann sofort feuern.
+        window.setTimeout(fire, 0);
+      } else {
+        window.addEventListener("load", function () {
+          fire();
+        }, { once: true });
+      }
+    })();
     checkLoaderUpdate(true).then(function () {
       if (document.body) {
         renderStoreOverlay(RUNTIME.apps, loadSettings());

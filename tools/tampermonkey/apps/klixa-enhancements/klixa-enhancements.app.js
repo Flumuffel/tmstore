@@ -2,7 +2,7 @@
 @id klixa-enhancements
 @name Klixa Enhancements
 @author PHO
-@version 2.0.7
+@version 2.0.8
 @description Legacy Enhancements
 @status published
 @approved true
@@ -143,6 +143,17 @@ function convertTimesInElement(parentElement) {
     }
 
     replaceLogo();
+
+    // Bei frühem App-Start kann das Logo noch fehlen -> nachziehen, wenn es später im DOM auftaucht.
+    try {
+        const observeTarget = document.body || document.documentElement;
+        if (observeTarget && typeof MutationObserver === "function") {
+            const obs = new MutationObserver(function () {
+                replaceLogo();
+            });
+            obs.observe(observeTarget, { childList: true, subtree: true });
+        }
+    } catch (e) {}
 })();
 
 // CSS-Anpassungen
@@ -364,6 +375,54 @@ function addGlobalStyle(css) {
     style.innerHTML = css;
     head.appendChild(style);
 }
+
+// Nachziehen für DOM-abhängige UI-Änderungen (z.B. bei schnellem Cache-Start)
+function tmStoreApplyKlixaDom(reason) {
+    try {
+        // 1. Online-Benutzerliste anpassen (idempotent)
+        const list = document.querySelector(".simply-scroll-list");
+        if (list) {
+            const listItems = list.querySelectorAll("li");
+            if (listItems && listItems.length) {
+                // Alte Initials entfernen, damit es nicht doppelt angezeigt wird.
+                listItems.forEach((li) => {
+                    const old = li.querySelector("span.showName");
+                    if (old) old.remove();
+                });
+                appendNames(listItems);
+                sortNames(listItems);
+            }
+        }
+
+        // 2. Gleitzeit-Gadget anpassen
+        document.querySelectorAll(".gadget").forEach((gadget) => {
+            const title = gadget.querySelector(".gadget_title");
+            if (title && title.textContent.includes("Tagesarbeitszeit / Gleitzeit-Saldo")) {
+                gadget.style.height = "auto";
+                gadget.style.overflow = "visible";
+                convertTimesInElement(gadget);
+            }
+        });
+
+        // 3. Schwarze Balken ersetzen
+        replaceBlackBordersWithRed();
+    } catch (e) {}
+}
+
+// Früh nachträglich anwenden
+tmStoreApplyKlixaDom("init");
+window.addEventListener("tm-store-window-load", function () {
+    tmStoreApplyKlixaDom("tm-store-window-load");
+});
+setTimeout(function () {
+    tmStoreApplyKlixaDom("retry-200ms");
+}, 200);
+setTimeout(function () {
+    tmStoreApplyKlixaDom("retry-800ms");
+}, 800);
+setTimeout(function () {
+    tmStoreApplyKlixaDom("retry-2000ms");
+}, 2000);
 
 // CSS-Anpassungen
 addGlobalStyle(/*css*/ `

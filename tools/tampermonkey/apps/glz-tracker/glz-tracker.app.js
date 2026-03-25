@@ -2,7 +2,7 @@
 @id glz-tracker
 @name GLZ Tracker
 @author PHO
-@version 1.1.3
+@version 1.1.4
 @description GLZ Live Tracker
 @status published
 @approved true
@@ -337,6 +337,12 @@ function getGlzAppSettings() {
 function initState() {
   const { wazSoll, wazIst, wazDiff, glzSaldo, loginTime, pauseTime, pauseMinsTotal, totStzMin } = readGadgetValues();
 
+  // DOM/Data ist manchmal erst kurz nach "load" / Cache-Start da.
+  // Wir warten deshalb, bis die wichtigsten Werte wirklich lesbar sind.
+  if (wazSoll == null || wazIst == null || loginTime == null || totStzMin == null) {
+    return false;
+  }
+
   state.totStzMin = totStzMin !== null ? totStzMin : 0;
   state.pauseMins = pauseMinsTotal || 0;
   state.loadTime = new Date();
@@ -365,15 +371,6 @@ function initState() {
   }
 
   applyWorkdaysFromAppSettings(getGlzAppSettings());
-  // Race-Schutz beim Init: Settings kurz nach Start erneut ziehen.
-  window.setTimeout(function () {
-    applyWorkdaysFromAppSettings(getGlzAppSettings());
-    tick();
-  }, 200);
-  window.setTimeout(function () {
-    applyWorkdaysFromAppSettings(getGlzAppSettings());
-    tick();
-  }, 900);
 
   document.getElementById('glz-waz-ist').textContent = wazIst || '–';
   document.getElementById('glz-waz-soll').textContent = wazSoll || '–';
@@ -418,6 +415,8 @@ function initState() {
       } catch (e) {}
     });
   }
+
+  return true;
 }
 
 function tick() {
@@ -451,11 +450,25 @@ function start() {
   // Wenn durch F5/Ctrl+F5 die load-Event bereits durch ist, trotzdem sauber starten.
   injectUI();
   makeDraggable();
-  initState();
-  tick();
-  if (!state._interval) {
-    state._interval = setInterval(tick, 1000);
+
+  var attempts = 0;
+  var maxAttempts = 20; // ca. 6-7 Sekunden bei 350ms
+  function attemptInit() {
+    attempts += 1;
+    var ok = initState();
+    if (ok) {
+      tick();
+      if (!state._interval) {
+        state._interval = setInterval(tick, 1000);
+      }
+      return;
+    }
+    if (attempts < maxAttempts) {
+      window.setTimeout(attemptInit, 350);
+    }
   }
+
+  attemptInit();
 }
 
 if (document.readyState === 'complete') {
