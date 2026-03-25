@@ -31,8 +31,10 @@ def parse_header(content: str) -> dict:
         if not line.startswith("@"):
             continue
         if " " not in line:
-            continue
-        key, value = line[1:].split(" ", 1)
+            key = line[1:].strip()
+            value = "true"
+        else:
+            key, value = line[1:].split(" ", 1)
         key = key.strip()
         value = value.strip()
         if key == "changelog":
@@ -91,6 +93,7 @@ def build_app_entry(meta: dict, rel_js_path: str, raw_base: str) -> dict:
         "id": app_id,
         "name": meta.get("name", app_id),
         "author": meta.get("author", ""),
+        "onDocumentLoad": parse_bool(meta.get("onDocumentLoad", meta.get("onDocumentload", "false"))),
         "description": meta.get("description", ""),
         "version": meta.get("version", "0.0.0"),
         "status": meta.get("status", "pending"),

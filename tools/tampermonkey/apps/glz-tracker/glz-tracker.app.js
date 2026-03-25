@@ -2,11 +2,12 @@
 @id glz-tracker
 @name GLZ Tracker
 @author PHO
-@version 1.0.2
+@version 1.0.4
 @description GLZ Live Tracker
 @status published
 @approved true
-@match ^https:\/\/intranet\.klixa\.ch\/.*$
+@match ^https:\/\/intranet\.klixa\.ch\/?(?:[?#].*)?$
+@onDocumentLoad
 ==/TMStoreApp== */
 
 
@@ -361,10 +362,19 @@ function tick() {
   endEl.className = 'glz-big ' + (remSecs <= 0 ? 'glz-positive' : 'glz-negative');
 }
 
-window.addEventListener('load', () => {
+function start() {
+  // Wenn durch F5/Ctrl+F5 die load-Event bereits durch ist, trotzdem sauber starten.
   injectUI();
   makeDraggable();
   initState();
   tick();
-  setInterval(tick, 1000);
-});
+  if (!state._interval) {
+    state._interval = setInterval(tick, 1000);
+  }
+}
+
+if (document.readyState === 'complete') {
+  start();
+} else {
+  window.addEventListener('load', start, { once: true });
+}

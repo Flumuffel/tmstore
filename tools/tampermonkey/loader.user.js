@@ -83,6 +83,9 @@
     fastCmdApplied: {},
     toastSeq: 0,
     updateTimerId: null,
+    deferredAppsQueue: [],
+    deferredAppsQueuedMap: {},
+    deferredAppsRunScheduled: false,
     storeUi: {
       searchQuery: "",
       page: 1
@@ -575,6 +578,17 @@
         }
       }
       if (found && !RUNTIME.loaded[appId]) {
+        if (found.onDocumentLoad && document.readyState !== "complete") {
+          // Für schnelle Page-Reloads wie F5: App-Ausführung erst nach dem echten "load" starten.
+          if (!RUNTIME.deferredAppsQueuedMap[appId]) {
+            RUNTIME.deferredAppsQueuedMap[appId] = true;
+            RUNTIME.deferredAppsQueue.push(found);
+          }
+          scheduleDeferredApps();
+          // UI bleibt konsistent; Ausführung passiert später.
+          return;
+        }
+
         runApp(found).then(function () {
           RUNTIME.loaded[appId] = true;
           RUNTIME.status.push({ appId: appId, ok: true, message: "Geladen (manuell aktiviert)" });
@@ -587,6 +601,7 @@
       }
     } else {
       RUNTIME.loaded[appId] = false;
+      delete RUNTIME.deferredAppsQueuedMap[appId];
       RUNTIME.status.push({ appId: appId, ok: true, message: "Deaktiviert (ohne Reload)" });
       renderBootFeedback();
       showToast(
@@ -1494,7 +1509,63 @@
     }, 350);
   }
 
+  async function runDeferredApps() {
+    // Nur einmal pro "Queue-Phase" ausführen.
+    RUNTIME.deferredAppsRunScheduled = false;
+
+    var queuedApps = RUNTIME.deferredAppsQueue.slice();
+    RUNTIME.deferredAppsQueue = [];
+
+    var currentSettings = loadSettings();
+
+    for (var j = 0; j < queuedApps.length; j += 1) {
+      var deferredApp = queuedApps[j];
+      if (!deferredApp) continue;
+      if (RUNTIME.loaded[deferredApp.id]) continue;
+      if (!isApprovedAndPublished(deferredApp)) continue;
+      if (!appIsEnabled(deferredApp.id, currentSettings)) continue;
+      if (deferredApp.match && !new RegExp(deferredApp.match).test(window.location.href)) continue;
+
+      try {
+        var result2 = await runApp(deferredApp);
+        if (result2 && result2.ok) {
+          RUNTIME.loaded[deferredApp.id] = true;
+        }
+        RUNTIME.status.push({
+          appId: deferredApp.id,
+          ok: !!(result2 && result2.ok),
+          message: result2 && result2.message ? result2.message : "Unbekannt"
+        });
+      } catch (err2) {
+        RUNTIME.status.push({
+          appId: deferredApp.id,
+          ok: false,
+          message: "Fehler: " + (err2 && err2.message ? err2.message : "Unbekannt")
+        });
+      }
+    }
+
+    // UI aktualisieren, damit "Geladen" Status nach Deferred-Start sichtbar ist.
+    renderStoreOverlay(RUNTIME.apps, currentSettings);
+  }
+
+  function scheduleDeferredApps() {
+    if (!RUNTIME.deferredAppsQueue.length) return;
+    if (RUNTIME.deferredAppsRunScheduled) return;
+    RUNTIME.deferredAppsRunScheduled = true;
+
+    if (document.readyState === "complete") {
+      runDeferredApps();
+    } else {
+      window.addEventListener("load", function () {
+        runDeferredApps();
+      }, { once: true });
+    }
+  }
+
   async function runEnabledApps(apps, settings) {
+    // Apps, die @onDocumentLoad setzen, werden erst nach "window.load" ausgeführt.
+    // Das verhindert Race-Conditions zwischen F5-Reloads und Apps, die auf "load" lauschen.
     for (var i = 0; i < apps.length; i += 1) {
       var app = apps[i];
       if (!isApprovedAndPublished(app)) continue;
@@ -1508,6 +1579,13 @@
         continue;
       }
       try {
+        if (app.onDocumentLoad === true) {
+          if (!RUNTIME.deferredAppsQueuedMap[app.id]) {
+            RUNTIME.deferredAppsQueuedMap[app.id] = true;
+            RUNTIME.deferredAppsQueue.push(app);
+          }
+          continue;
+        }
         var result = await runApp(app);
         if (result && result.ok) {
           RUNTIME.loaded[app.id] = true;
@@ -1525,6 +1603,9 @@
         });
       }
     }
+
+    // Wenn Deferred-Apps gequeued sind, beim echten "load" ausführen.
+    scheduleDeferredApps();
   }
 
   async function boot() {

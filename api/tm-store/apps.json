@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-03-25T10:06:37+01:00",
+  "updatedAt": "2026-03-25T10:37:14+01:00",
   "source": {
     "type": "github",
     "repository": "https://github.com/Flumuffel/tmstore",
@@ -11,13 +11,14 @@
       "id": "glz-tracker",
       "name": "GLZ Tracker",
       "author": "PHO",
+      "onDocumentLoad": true,
       "description": "GLZ Live Tracker",
-      "version": "1.0.1",
+      "version": "1.0.4",
       "status": "published",
       "approved": true,
       "bundleUrl": "https://raw.githubusercontent.com/Flumuffel/tmstore/refs/heads/main/tools/tampermonkey/apps/glz-tracker/glz-tracker.app.js",
       "cssUrl": "",
-      "match": "^https:\\/\\/intranet\\.klixa\\.ch\\/.*$",
+      "match": "^https:\\/\\/intranet\\.klixa\\.ch\\/?(?:[?#].*)?$",
       "sha256": "",
       "changelog": [],
       "settings": []
@@ -26,6 +27,7 @@
       "id": "klixa-enhancements",
       "name": "Klixa Enhancements",
       "author": "PHO",
+      "onDocumentLoad": false,
       "description": "Legacy Enhancements",
       "version": "2.0.7",
       "status": "published",
