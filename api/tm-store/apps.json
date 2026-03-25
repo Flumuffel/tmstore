@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-03-25T09:23:14+01:00",
+  "updatedAt": "2026-03-25T09:28:50+01:00",
   "source": {
     "type": "github",
     "repository": "https://github.com/Flumuffel/tmstore",
@@ -27,7 +27,7 @@
       "name": "Klixa Enhancements",
       "author": "PHO",
       "description": "Legacy Enhancements",
-      "version": "2.0.6",
+      "version": "2.0.7",
       "status": "published",
       "approved": true,
       "bundleUrl": "https://raw.githubusercontent.com/Flumuffel/tmstore/refs/heads/main/tools/tampermonkey/apps/klixa-enhancements/klixa-enhancements.app.js",
