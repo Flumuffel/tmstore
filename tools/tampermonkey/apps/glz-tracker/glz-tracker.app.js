@@ -2,7 +2,7 @@
 @id glz-tracker
 @name GLZ Tracker
 @author PHO
-@version 1.1.2
+@version 1.1.3
 @description GLZ Live Tracker
 @status published
 @approved true
@@ -220,7 +220,7 @@ function todayStr() {
 
 function readGadgetValues() {
   let wazSoll = null, wazIst = null, wazDiff = null, glzSaldo = null;
-  let loginTime = null, pauseTime = null, totStzMin = null;
+  let loginTime = null, pauseTime = null, pauseMinsTotal = 0, totStzMin = null;
   const today = todayStr();
 
   const gadgets = document.querySelectorAll('.gadget');
@@ -257,17 +257,34 @@ function readGadgetValues() {
         }
 
         if (cells[1]) {
+          // Stz kann mehrere Intervalle enthalten, z.B. 08:50–12:34 und 13:06–jetzt.
+          // Wir extrahieren alle Uhrzeiten und berechnen Pausen zwischen "Ende_i" -> "Start_{i+1}".
           const allTimes = cells[1].innerHTML.match(/\d{1,2}:\d{2}/g);
-          if (allTimes && allTimes.length >= 4) {
-            const auslogge = allTimes[1];
-            const einlogge2 = allTimes[2];
-            const [ah, am] = auslogge.split(':').map(Number);
-            const [eh, em] = einlogge2.split(':').map(Number);
-            const pauseMins = (eh * 60 + em) - (ah * 60 + am);
-            if (pauseMins > 0) {
-              const ph = Math.floor(pauseMins / 60);
-              const pm = String(pauseMins % 60).padStart(2, '0');
-              pauseTime = ph + ':' + pm + ' h';
+          if (allTimes && allTimes.length >= 3) {
+            const pauses = [];
+            var totalPause = 0;
+            // Erwartetes Pattern: [start1, end1, start2, end2, start3, end3, ...]
+            for (var t = 1; t + 1 < allTimes.length; t += 2) {
+              var endT = allTimes[t];
+              var nextStart = allTimes[t + 1];
+              var ehm = endT.split(':').map(Number);
+              var shm = nextStart.split(':').map(Number);
+              if (ehm.length !== 2 || shm.length !== 2) continue;
+              var endMin = ehm[0] * 60 + ehm[1];
+              var startMin = shm[0] * 60 + shm[1];
+              var diff = startMin - endMin;
+              if (diff > 0) {
+                totalPause += diff;
+                pauses.push({ from: endT, to: nextStart, mins: diff });
+              }
+            }
+            pauseMinsTotal = totalPause;
+            if (pauses.length === 1) {
+              pauseTime = pauses[0].from + "–" + pauses[0].to + " (" + formatMins(pauses[0].mins) + ")";
+            } else if (pauses.length > 1) {
+              pauseTime = pauses.map(function (p) {
+                return p.from + "–" + p.to + " (" + formatMins(p.mins) + ")";
+              }).join(" · ");
             }
           }
         }
@@ -286,16 +303,7 @@ function readGadgetValues() {
               // Falls die Login-Zeit z.B. kurz nach Mitternacht liegt.
               if (loginMins > nowMins) loginMins -= 1440;
 
-              var pauseMins = 0;
-              if (pauseTime) {
-                // pauseTime ist z.B. "1:05 h"
-                var pm = String(pauseTime).match(/(\d+):(\d{2})\s*h/);
-                if (pm) {
-                  pauseMins = parseInt(pm[1], 10) * 60 + parseInt(pm[2], 10);
-                }
-              }
-
-              var elapsed = nowMins - loginMins - pauseMins;
+              var elapsed = nowMins - loginMins - (pauseMinsTotal || 0);
               if (!isNaN(elapsed)) totStzMin = elapsed;
             }
           }
@@ -308,7 +316,7 @@ function readGadgetValues() {
     }
   }
 
-  return { wazSoll, wazIst, wazDiff, glzSaldo, loginTime, pauseTime, totStzMin };
+  return { wazSoll, wazIst, wazDiff, glzSaldo, loginTime, pauseTime, pauseMinsTotal, totStzMin };
 }
 
 const state = {};
@@ -327,9 +335,10 @@ function getGlzAppSettings() {
 }
 
 function initState() {
-  const { wazSoll, wazIst, wazDiff, glzSaldo, loginTime, pauseTime, totStzMin } = readGadgetValues();
+  const { wazSoll, wazIst, wazDiff, glzSaldo, loginTime, pauseTime, pauseMinsTotal, totStzMin } = readGadgetValues();
 
   state.totStzMin = totStzMin !== null ? totStzMin : 0;
+  state.pauseMins = pauseMinsTotal || 0;
   state.loadTime = new Date();
 
   const wazSollMin = parseTime(wazSoll);
