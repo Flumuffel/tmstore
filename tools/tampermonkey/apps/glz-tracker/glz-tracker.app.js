@@ -2,7 +2,7 @@
 @id glz-tracker
 @name GLZ Tracker
 @author PHO
-@version 1.1.1
+@version 1.1.2
 @description GLZ Live Tracker
 @status published
 @approved true
@@ -335,12 +335,24 @@ function initState() {
   const wazSollMin = parseTime(wazSoll);
   state.wazSollMin = wazSollMin;
   // App-spezifisches Setting: Arbeitstage pro Woche (1..5)
+  var appliedWorkdays = false;
   function applyWorkdaysFromAppSettings(appSettings) {
-    var cfg = Number(appSettings && appSettings.arbeitstage != null ? appSettings.arbeitstage : 5);
+    var hasVal = !!(appSettings && appSettings.arbeitstage != null);
+    // Wenn wir schon einen Wert angewendet haben und der Re-Read gerade nichts liefert,
+    // sollen wir den stabilen Zustand nicht wieder auf Default überschreiben.
+    if (!hasVal) {
+      if (appliedWorkdays) return;
+      // Erstes Apply: wenn noch keine Settings vorhanden sind, fallbacken wir.
+      appSettings = appSettings || {};
+      appSettings.arbeitstage = 5;
+    }
+
+    var cfg = Number(appSettings.arbeitstage);
     if (!cfg || isNaN(cfg)) cfg = 5;
     var workdays = Math.max(1, Math.min(5, Math.floor(cfg)));
     state.tageSollMin = state.wazSollMin !== null ? Math.round(state.wazSollMin / workdays) : (8 * 60 + 24);
     document.getElementById('glz-taz-soll').textContent = formatMins(state.tageSollMin);
+    appliedWorkdays = true;
   }
 
   applyWorkdaysFromAppSettings(getGlzAppSettings());
