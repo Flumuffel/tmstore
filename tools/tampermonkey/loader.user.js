@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Klixa TM Store Loader
 // @namespace    klixa.tm.store
-// @version      0.4.24
+// @version      0.4.25
 // @author LWE
 // @description  Loads approved Intranet apps from GitHub Raw manifest
 // @match        https://intranet.klixa.ch/*
@@ -575,9 +575,6 @@
         }
       }
       if (found && !RUNTIME.loaded[appId]) {
-        var appCfg = getAppSettings(settings, appId);
-        var authorValue = appCfg.author != null ? appCfg.author : found.author;
-        applyAuthorFastCmd(appId, authorValue);
         runApp(found).then(function () {
           RUNTIME.loaded[appId] = true;
           RUNTIME.status.push({ appId: appId, ok: true, message: "Geladen (manuell aktiviert)" });
@@ -1510,9 +1507,6 @@
         addLog("info", "app:" + app.id, "Übersprungen: URL-Match trifft nicht zu", { match: app.match, url: window.location.href });
         continue;
       }
-      var appCfg = getAppSettings(settings, app.id);
-      var authorValue = appCfg.author != null ? appCfg.author : app.author;
-      applyAuthorFastCmd(app.id, authorValue);
       try {
         var result = await runApp(app);
         if (result && result.ok) {
