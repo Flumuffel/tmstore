@@ -2,7 +2,7 @@
 @id klixa-enhancements
 @name Klixa Enhancements
 @author PHO
-@version 2.1.4
+@version 2.1.5
 @description Legacy Enhancements
 @status published
 @approved true
@@ -373,7 +373,7 @@ input[type=submit], input[type=reset],
     color: rgb(222, 226, 230) !important;
 }
 
-.chosen-container .chosen-results {
+ul.chosen-results {
     color: white !important;
 }
 
