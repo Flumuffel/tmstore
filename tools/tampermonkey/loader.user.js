@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Klixa TM Store Loader
 // @namespace    klixa.tm.store
-// @version      0.4.30
+// @version      0.4.31
 // @author LWE
 // @description  Loads approved Intranet apps from GitHub Raw manifest
 // @match        https://intranet.klixa.ch/*
@@ -970,6 +970,8 @@
 
     var close = root.getElementById("tm-store-close");
     close.addEventListener("click", function () {
+      // Nur einmal speichern: falls Settings geändert wurden, beim Schließen flushen.
+      if (typeof flushSettingsIfDirty === "function") flushSettingsIfDirty("overlay-close");
       overlay.style.display = "none";
     });
 
@@ -995,6 +997,12 @@
     var filterReset = root.getElementById("tm-store-filter-reset");
     var pagePrev = root.getElementById("tm-store-page-prev");
     var pageNext = root.getElementById("tm-store-page-next");
+    var settingsDirty = false;
+    function flushSettingsIfDirty(reason) {
+      if (!settingsDirty) return;
+      settingsDirty = false;
+      collectAndSaveSettings(reason || "flush");
+    }
     function saveSettingsWithToast(next, reason) {
       saveSettings(next);
       startPeriodicUpdateChecks();
@@ -1101,6 +1109,7 @@
     });
     settingsBtn.addEventListener("click", function () {
       var open = settingsWrap && settingsWrap.style.display !== "none";
+      if (open) flushSettingsIfDirty("settings-close");
       setPageView(open ? "main" : "settings");
       if (!open && updateInterval) {
         updateInterval.value = String(getUpdateIntervalMs(settings));
@@ -1183,12 +1192,13 @@
       var settingFields = appSettingsWrap.querySelectorAll("[data-settings-field='1']");
       for (var f = 0; f < settingFields.length; f += 1) {
         settingFields[f].addEventListener("blur", function () {
-          collectAndSaveSettings("focus-loss");
+          flushSettingsIfDirty("focus-loss");
         });
-        // Wichtig: Bei number/string wird oft kein blur ausgelöst (z.B. Overlay schließen),
-        // daher auch auf change speichern, damit es nach F5/Ctrl+F5 sofort korrekt ist.
         settingFields[f].addEventListener("change", function () {
-          collectAndSaveSettings("change");
+          settingsDirty = true;
+        });
+        settingFields[f].addEventListener("input", function () {
+          settingsDirty = true;
         });
       }
     }
