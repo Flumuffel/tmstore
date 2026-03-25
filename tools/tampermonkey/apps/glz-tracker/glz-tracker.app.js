@@ -2,7 +2,7 @@
 @id glz-tracker
 @name GLZ Tracker
 @author PHO
-@version 1.0.9
+@version 1.1.0
 @description GLZ Live Tracker
 @status published
 @approved true
@@ -313,6 +313,19 @@ function readGadgetValues() {
 
 const state = {};
 
+function getGlzAppSettings() {
+  try {
+    if (typeof window.__TM_STORE_GET_APP_SETTINGS === "function") {
+      return window.__TM_STORE_GET_APP_SETTINGS("glz-tracker") || {};
+    }
+    // Fallback: nur wenn Context noch passt.
+    if (window.__TM_STORE_CONTEXT && window.__TM_STORE_CONTEXT.appId === "glz-tracker") {
+      return window.__TM_STORE_CONTEXT.appSettings || {};
+    }
+  } catch (err) {}
+  return {};
+}
+
 function initState() {
   const { wazSoll, wazIst, wazDiff, glzSaldo, loginTime, pauseTime, totStzMin } = readGadgetValues();
 
@@ -330,8 +343,7 @@ function initState() {
     document.getElementById('glz-taz-soll').textContent = formatMins(state.tageSollMin);
   }
 
-  var appSettings = (window.__TM_STORE_CONTEXT && window.__TM_STORE_CONTEXT.appSettings) ? window.__TM_STORE_CONTEXT.appSettings : {};
-  applyWorkdaysFromAppSettings(appSettings);
+  applyWorkdaysFromAppSettings(getGlzAppSettings());
 
   document.getElementById('glz-waz-ist').textContent = wazIst || '–';
   document.getElementById('glz-waz-soll').textContent = wazSoll || '–';
@@ -356,8 +368,12 @@ function initState() {
 
   // App-Version anzeigen (aus Loader-Kontext).
   var vEl = document.getElementById('glz-app-version');
-  if (vEl && window.__TM_STORE_CONTEXT && window.__TM_STORE_CONTEXT.appVersion) {
-    vEl.textContent = "v" + String(window.__TM_STORE_CONTEXT.appVersion);
+  if (vEl && !vEl.textContent) {
+    try {
+      if (window.__TM_STORE_CONTEXT && window.__TM_STORE_CONTEXT.appId === "glz-tracker" && window.__TM_STORE_CONTEXT.appVersion) {
+        vEl.textContent = "v" + String(window.__TM_STORE_CONTEXT.appVersion);
+      }
+    } catch (e) {}
   }
 
   // Bei App-Settings-Änderungen neu berechnen.
