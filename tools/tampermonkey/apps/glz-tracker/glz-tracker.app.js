@@ -2,12 +2,13 @@
 @id glz-tracker
 @name GLZ Tracker
 @author PHO
-@version 1.0.7
+@version 1.0.9
 @description GLZ Live Tracker
 @status published
 @approved true
 @match ^https:\/\/intranet\.klixa\.ch\/?(?:[?#].*)?$
 @onDocumentLoad
+@settings arbeitstage number 5 1 5
 ==/TMStoreApp== */
 
 
@@ -124,10 +125,6 @@ const HTML = `
           <span>Pause</span>
           <span id="glz-pause-time">–</span>
         </div>
-        <div class="glz-row" style="font-size:11px; color: rgb(173,181,189);">
-          <span>Erkannte Arbeitstage</span>
-          <span id="glz-workdays-debug">–</span>
-        </div>
       </div>
     `;
 
@@ -216,10 +213,6 @@ function todayStr() {
 
 function readGadgetValues() {
   let wazSoll = null, wazIst = null, wazDiff = null, glzSaldo = null;
-  let arbeitstageInWeek = null;
-  let workdaysFromTaz = 0;
-  let workdaysFromWazSoll = null;
-  let arbeitstageSource = null;
   let loginTime = null, pauseTime = null, totStzMin = null;
   const today = todayStr();
 
@@ -240,11 +233,6 @@ function readGadgetValues() {
       }
       if (rowText.includes('WAZ soll') && !rowText.includes('diff')) {
         wazSoll = cells[cells.length - 1].textContent.trim();
-        const mWorkdays = String(wazSoll || "").match(/\/\s*(\d{1,2})/);
-        if (mWorkdays) {
-          const wd = parseInt(mWorkdays[1], 10);
-          if (!isNaN(wd) && wd > 0) workdaysFromWazSoll = wd;
-        }
       }
       if (rowText.includes('WAZ diff')) {
         wazDiff = cells[cells.length - 1].textContent.trim();
@@ -310,67 +298,26 @@ function readGadgetValues() {
         }
       }
 
-      // Arbeitstage automatisch aus den "TAZ"-Zeilen ableiten:
-      // WICHTIG: Wir müssen direkte "tr > td"-Zellen nehmen, weil in "Stz" verschachtelte Tabellen
-      // sonst die Indizes von querySelectorAll('td') verschieben können.
-      var directTds = row && row.querySelectorAll ? row.querySelectorAll(":scope > td") : null;
-      if (directTds && directTds.length >= 2) {
-        const dateText = (directTds[0] && directTds[0].textContent ? directTds[0].textContent.trim() : "");
-        if (/^\d{1,2}\.\d{2}$/.test(dateText)) {
-          const tazIdx = directTds.length - 2; // vorletzte direkte Spalte
-          const tazText =
-            directTds[tazIdx] && directTds[tazIdx].textContent ? directTds[tazIdx].textContent.trim() : "";
-          const tazMins = parseTime(tazText);
-          if (tazMins !== null && tazMins !== 0) {
-            workdaysFromTaz += 1;
-          }
-        }
-      }
     }
   }
 
-  // Priorität: TAZ-Zählung (robuster), sonst WAZ-soll "/n" als Fallback.
-  if (workdaysFromTaz > 0) {
-    arbeitstageInWeek = workdaysFromTaz;
-    arbeitstageSource = "TAZ";
-  } else if (workdaysFromWazSoll && workdaysFromWazSoll > 0) {
-    arbeitstageInWeek = workdaysFromWazSoll;
-    arbeitstageSource = "WAZ_soll";
-  }
-
-  return {
-    wazSoll,
-    wazIst,
-    wazDiff,
-    glzSaldo,
-    loginTime,
-    pauseTime,
-    totStzMin,
-    arbeitstageInWeek,
-    arbeitstageSource,
-  };
+  return { wazSoll, wazIst, wazDiff, glzSaldo, loginTime, pauseTime, totStzMin };
 }
 
 const state = {};
 
 function initState() {
-  const {
-    wazSoll,
-    wazIst,
-    wazDiff,
-    glzSaldo,
-    loginTime,
-    pauseTime,
-    totStzMin,
-    arbeitstageInWeek,
-    arbeitstageSource,
-  } = readGadgetValues();
+  const { wazSoll, wazIst, wazDiff, glzSaldo, loginTime, pauseTime, totStzMin } = readGadgetValues();
 
   state.totStzMin = totStzMin !== null ? totStzMin : 0;
   state.loadTime = new Date();
 
   const wazSollMin = parseTime(wazSoll);
-  const workdays = arbeitstageInWeek && arbeitstageInWeek > 0 ? arbeitstageInWeek : 5;
+  // App-spezifisches Setting: Arbeitstage pro Woche (1..5)
+  var appSettings = (window.__TM_STORE_CONTEXT && window.__TM_STORE_CONTEXT.appSettings) ? window.__TM_STORE_CONTEXT.appSettings : {};
+  var cfg = Number(appSettings && appSettings.arbeitstage != null ? appSettings.arbeitstage : 5);
+  if (!cfg || isNaN(cfg)) cfg = 5;
+  var workdays = Math.max(1, Math.min(5, Math.floor(cfg)));
   state.tageSollMin = wazSollMin !== null ? Math.round(wazSollMin / workdays) : (8 * 60 + 24);
 
   document.getElementById('glz-waz-ist').textContent = wazIst || '–';
@@ -393,11 +340,6 @@ function initState() {
 
   document.getElementById('glz-login-time').textContent = loginTime ? loginTime + ' Uhr' : '–';
   document.getElementById('glz-pause-time').textContent = pauseTime || 'keine';
-  var workdaysEl = document.getElementById('glz-workdays-debug');
-  if (workdaysEl) {
-    var src = arbeitstageSource ? String(arbeitstageSource) : "FALLBACK";
-    workdaysEl.textContent = workdays + " (" + src + ")";
-  }
 }
 
 function tick() {

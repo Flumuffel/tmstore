@@ -42,36 +42,74 @@ def parse_header(content: str) -> dict:
         elif key == "settings":
             parts = value.split(" ", 2)
             if len(parts) < 2:
-                raise ValueError("Ungültiges @settings Format. Erwartet: @settings <key> <type> <default>")
+                raise ValueError("Ungültiges @settings Format. Erwartet: @settings <key> <type> <default> [min] [max]")
+
             setting_key = parts[0].strip()
             setting_type = parts[1].strip().lower()
-            raw_default = parts[2].strip() if len(parts) >= 3 else ""
+
             if setting_type not in {"toggle", "string", "number"}:
                 raise ValueError(f"Ungültiger @settings Typ '{setting_type}' für '{setting_key}'")
+
             default_value: object
-            if setting_type == "toggle":
-                default_value = parse_bool(raw_default or "false")
-            elif setting_type == "number":
+            min_value: object | None = None
+            max_value: object | None = None
+
+            if setting_type == "number":
+                # Für number: @settings <key> number <default> [min] [max]
+                tokens = value.split()
+                if len(tokens) < 3:
+                    raise ValueError(f"Ungültiges @settings number Format für '{setting_key}'")
+                raw_default = tokens[2]
+                raw_min = tokens[3] if len(tokens) >= 4 else None
+                raw_max = tokens[4] if len(tokens) >= 5 else None
+                if len(tokens) > 5:
+                    raise ValueError(f"Ungültiges @settings number Format für '{setting_key}' (zu viele Parameter)")
+
                 try:
                     default_value = float(raw_default)
                     if int(default_value) == default_value:
                         default_value = int(default_value)
                 except Exception as exc:
                     raise ValueError(f"Ungültiger Number-Default für '{setting_key}': {raw_default}") from exc
+
+                def parse_num(raw: str) -> object:
+                    try:
+                        v = float(raw)
+                        if int(v) == v:
+                            return int(v)
+                        return v
+                    except Exception as exc:
+                        raise ValueError(f"Ungültiger Number-Wert: {raw}") from exc
+
+                if raw_min is not None:
+                    min_value = parse_num(raw_min)
+                if raw_max is not None:
+                    max_value = parse_num(raw_max)
+
             else:
-                default_value = raw_default
-                if len(default_value) >= 2 and (
-                    (default_value.startswith('"') and default_value.endswith('"'))
-                    or (default_value.startswith("'") and default_value.endswith("'"))
-                ):
-                    default_value = default_value[1:-1]
-            settings.append(
-                {
-                    "key": setting_key,
-                    "type": setting_type,
-                    "default": default_value,
-                }
-            )
+                raw_default = parts[2].strip() if len(parts) >= 3 else ""
+                if setting_type == "toggle":
+                    default_value = parse_bool(raw_default or "false")
+                else:
+                    default_value = raw_default
+                    if len(default_value) >= 2 and (
+                        (default_value.startswith('"') and default_value.endswith('"'))
+                        or (default_value.startswith("'") and default_value.endswith("'"))
+                    ):
+                        default_value = default_value[1:-1]
+
+            entry: dict = {
+                "key": setting_key,
+                "type": setting_type,
+                "default": default_value,
+            }
+            if setting_type == "number":
+                if min_value is not None:
+                    entry["min"] = min_value
+                if max_value is not None:
+                    entry["max"] = max_value
+
+            settings.append(entry)
         else:
             data[key] = value
 

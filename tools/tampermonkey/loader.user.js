@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Klixa TM Store Loader
 // @namespace    klixa.tm.store
-// @version      0.4.27
+// @version      0.4.28
 // @author LWE
 // @description  Loads approved Intranet apps from GitHub Raw manifest
 // @match        https://intranet.klixa.ch/*
@@ -1007,7 +1007,12 @@
           var field = root.getElementById("tm-app-setting-" + app.id + "-" + s.key);
           if (!field) continue;
           if (s.type === "toggle") current[s.key] = !!field.checked;
-          else if (s.type === "number") current[s.key] = Number(field.value || 0);
+          else if (s.type === "number") {
+            var v = Number(field.value || 0);
+            if (typeof s.min === "number") v = Math.max(s.min, v);
+            if (typeof s.max === "number") v = Math.min(s.max, v);
+            current[s.key] = v;
+          }
           else current[s.key] = String(field.value || "");
         }
         next.appSettings[app.id] = current;
@@ -1123,10 +1128,12 @@
             );
           }
           if (s.type === "number") {
+            var minAttr = typeof s.min === "number" ? " min='" + escapeHtml(s.min) + "'" : "";
+            var maxAttr = typeof s.max === "number" ? " max='" + escapeHtml(s.max) + "'" : "";
             return (
               "<div class='tm-store-field'>" +
                 "<label for='" + id + "'>" + escapeHtml(s.key) + " (number)</label>" +
-                "<input id='" + id + "' data-settings-field='1' data-app-id='" + app.id + "' data-key='" + escapeHtml(s.key) + "' data-type='number' type='number' value='" + escapeHtml(current) + "'>" +
+                "<input id='" + id + "' data-settings-field='1' data-app-id='" + app.id + "' data-key='" + escapeHtml(s.key) + "' data-type='number' type='number'" + minAttr + maxAttr + " value='" + escapeHtml(current) + "'>" +
               "</div>"
             );
           }
