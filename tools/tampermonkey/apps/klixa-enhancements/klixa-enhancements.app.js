@@ -2,7 +2,7 @@
 @id klixa-enhancements
 @name Klixa Enhancements
 @author PHO
-@version 2.0.5
+@version 2.0.6
 @description Legacy Enhancements
 @status published
 @approved true
@@ -152,6 +152,7 @@ td #rm_bg,
 td#rt,
 td#mt,
 td#lt,
+td#tpl,
 td #lm_bg,
 td#lb,
 td#mb,
