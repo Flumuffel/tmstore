@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-03-25T09:28:50+01:00",
+  "updatedAt": "2026-03-25T10:06:37+01:00",
   "source": {
     "type": "github",
     "repository": "https://github.com/Flumuffel/tmstore",
@@ -12,7 +12,7 @@
       "name": "GLZ Tracker",
       "author": "PHO",
       "description": "GLZ Live Tracker",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "status": "published",
       "approved": true,
       "bundleUrl": "https://raw.githubusercontent.com/Flumuffel/tmstore/refs/heads/main/tools/tampermonkey/apps/glz-tracker/glz-tracker.app.js",
