@@ -3,7 +3,7 @@
 @name Ticket Extras
 @author LWE
 @version 1.0.2
-@description Öffnet Kunden aus Ticketliste per Icon (k{nummer})
+@description Öffnet Kunden aus Ticketliste per Icon
 @status published
 @approved true
 @match ^https:\/\/intranet\.klixa\.ch\/.*$
