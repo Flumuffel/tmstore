@@ -1,5 +1,9 @@
 {
+<<<<<<< HEAD
   "updatedAt": "2026-03-26T15:27:54+01:00",
+=======
+  "updatedAt": "2026-03-26T15:24:28+01:00",
+>>>>>>> aa59189abfef23dcce99e08ef6944b92b72a4192
   "source": {
     "type": "github",
     "repository": "https://github.com/Flumuffel/tmstore",
