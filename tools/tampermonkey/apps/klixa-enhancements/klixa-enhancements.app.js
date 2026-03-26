@@ -367,9 +367,16 @@ form,
 .ui-widget-header,
 input[type=submit], input[type=reset],
 .cluetip-jtip h3#cluetip-title,
+.collapsible .odd,
 .ui-state-default, .ui-widget-content .ui-state-default, .ui-widget-header .ui-state-default{
     background: none;
     background-color: rgb(52, 58, 64);
+    color: rgb(222, 226, 230) !important;
+}
+
+.collapsible .even {
+    background: none;
+    background-color: rgb(52 62 64);
     color: rgb(222, 226, 230) !important;
 }
 
