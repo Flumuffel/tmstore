@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-03-26T14:33:25+01:00",
+  "updatedAt": "2026-03-26T15:18:32+01:00",
   "source": {
     "type": "github",
     "repository": "https://github.com/Flumuffel/tmstore",
@@ -58,6 +58,25 @@
           "default": ""
         }
       ]
+    },
+    {
+      "id": "ticket-extras",
+      "name": "Ticket Extras",
+      "author": "PHO",
+      "onDocumentLoad": true,
+      "description": "Öffnet Kunden aus Ticketliste per Icon (k{nummer})",
+      "version": "1.0.0",
+      "status": "published",
+      "approved": true,
+      "bundleUrl": "https://raw.githubusercontent.com/Flumuffel/tmstore/refs/heads/main/tools/tampermonkey/apps/ticket-extras/ticket-extras.app.js",
+      "cssUrl": "",
+      "match": "^https:\\/\\/intranet\\.klixa\\.ch\\/.*$",
+      "sha256": "",
+      "changelog": [
+        "Fügt ein Kunden-Icon vor Ticketzeilen hinzu",
+        "Klick sendet k{nummer} an #fast_cmd"
+      ],
+      "settings": []
     }
   ],
   "submissionQueue": []
