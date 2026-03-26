@@ -2,7 +2,7 @@
 @id klixa-enhancements
 @name Klixa Enhancements
 @author PHO
-@version 2.1.5
+@version 2.1.6
 @description Legacy Enhancements
 @status published
 @approved true
