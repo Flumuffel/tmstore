@@ -1,9 +1,5 @@
 {
-<<<<<<< HEAD
-  "updatedAt": "2026-03-26T15:23:38+01:00",
-=======
-  "updatedAt": "2026-03-26T15:19:28+01:00",
->>>>>>> 0990f32169e106004002e88ef6f8058e6b6050d3
+  "updatedAt": "2026-03-26T15:27:54+01:00",
   "source": {
     "type": "github",
     "repository": "https://github.com/Flumuffel/tmstore",
@@ -69,7 +65,7 @@
       "author": "LWE",
       "onDocumentLoad": true,
       "description": "Öffnet Kunden aus Ticketliste per Icon (k{nummer})",
-      "version": "1.0.1",
+      "version": "1.0.2",
       "status": "published",
       "approved": true,
       "bundleUrl": "https://raw.githubusercontent.com/Flumuffel/tmstore/refs/heads/main/tools/tampermonkey/apps/ticket-extras/ticket-extras.app.js",

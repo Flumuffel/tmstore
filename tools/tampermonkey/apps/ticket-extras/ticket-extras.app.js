@@ -2,7 +2,7 @@
 @id ticket-extras
 @name Ticket Extras
 @author LWE
-@version 1.0.1
+@version 1.0.2
 @description Öffnet Kunden aus Ticketliste per Icon (k{nummer})
 @status published
 @approved true
@@ -24,7 +24,7 @@
     var style = document.createElement("style");
     style.id = "tm-ticket-extras-style";
     style.textContent =
-      "." + ICON_WRAP_CLASS + "{display:inline-flex;align-items:center;gap:4px;margin-right:6px}" +
+      "." + ICON_WRAP_CLASS + "{display:flex;align-items:center;justify-content:center;margin-bottom:4px}" +
       "." + ICON_BTN_CLASS + "{width:22px;height:22px;border-radius:6px;border:1px solid #7aa92f;background:#2b3138;color:#d8ff7a;cursor:pointer;font-weight:800;line-height:1}" +
       "." + ICON_BTN_CLASS + ":hover{filter:brightness(1.1)}";
     document.head.appendChild(style);
@@ -60,7 +60,14 @@
     var txt = row.textContent || "";
     // Greift z.B. "(420HU)" oder "(751MSR100K)"
     var m = txt.match(/\(([0-9][A-Za-z0-9]*)\)/);
-    return m ? String(m[1]).trim() : "";
+    if (!m) return "";
+    var raw = String(m[1] || "").trim();
+    if (raw.length > 2) raw = raw.slice(0, -2); // Wunsch: letzte 2 Zeichen abschneiden
+    var onlyDigits = raw.replace(/\D/g, "");
+    if (onlyDigits) return onlyDigits;
+    // Fallback auf führende Zahl, falls Format abweicht
+    var lead = String(m[1] || "").match(/^\d+/);
+    return lead ? String(lead[0]) : "";
   }
 
   function isTicketRow(tr) {
