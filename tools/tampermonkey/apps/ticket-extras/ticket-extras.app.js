@@ -2,7 +2,7 @@
 @id ticket-extras
 @name Ticket Extras
 @author LWE
-@version 1.0.2
+@version 1.0.3
 @description Öffnet Kunden aus Ticketliste per Icon
 @status published
 @approved true
@@ -16,6 +16,8 @@
 
   var TARGET_TABLE_ID = "tbl_t3_tickets";
   var ICON_WRAP_CLASS = "tm-ticket-extras-wrap";
+  var ICON_HEADER_CLASS = "tm-ticket-extras-header";
+  var ICON_ROW_CELL_CLASS = "tm-ticket-extras-row-cell";
   var ICON_BTN_CLASS = "tm-ticket-extras-btn";
   var PROCESSED_ROW_ATTR = "data-tm-ticket-extras-processed";
 
@@ -24,7 +26,9 @@
     var style = document.createElement("style");
     style.id = "tm-ticket-extras-style";
     style.textContent =
-      "." + ICON_WRAP_CLASS + "{display:flex;align-items:center;justify-content:center;margin-bottom:4px}" +
+      "." + ICON_HEADER_CLASS + "{width:42px;min-width:42px;text-align:center}" +
+      "." + ICON_ROW_CELL_CLASS + "{width:42px;min-width:42px;text-align:center}" +
+      "." + ICON_WRAP_CLASS + "{display:flex;align-items:center;justify-content:center}" +
       "." + ICON_BTN_CLASS + "{width:22px;height:22px;border-radius:6px;border:1px solid #7aa92f;background:#2b3138;color:#d8ff7a;cursor:pointer;font-weight:800;line-height:1}" +
       "." + ICON_BTN_CLASS + ":hover{filter:brightness(1.1)}";
     document.head.appendChild(style);
@@ -57,16 +61,19 @@
 
   function extractCustomerNumber(row) {
     if (!row) return "";
-    var txt = row.textContent || "";
-    // Greift z.B. "(420HU)" oder "(751MSR100K)"
-    var m = txt.match(/\(([0-9][A-Za-z0-9]*)\)/);
+    var tds = row.querySelectorAll("td");
+    if (!tds || tds.length < 4) return "";
+    // Original-Layout: [cmd, id, knr, kunde, ...]
+    // Wir lesen explizit aus Kunde-Spalte, nicht aus gesamter Zeile.
+    var kundeText = String((tds[3] && tds[3].textContent) || "").trim();
+    if (!kundeText) return "";
+    // Erwartet z.B. "(2305MC)" -> wir brauchen "2305"
+    var m = kundeText.match(/\((\d+[A-Za-z0-9]*)\)/);
     if (!m) return "";
     var raw = String(m[1] || "").trim();
-    if (raw.length > 2) raw = raw.slice(0, -2); // Wunsch: letzte 2 Zeichen abschneiden
-    var onlyDigits = raw.replace(/\D/g, "");
-    if (onlyDigits) return onlyDigits;
-    // Fallback auf führende Zahl, falls Format abweicht
-    var lead = String(m[1] || "").match(/^\d+/);
+    // Nur dann 2 Zeichen schneiden, wenn es wirklich 2 Buchstaben am Ende sind.
+    if (/[A-Za-z]{2}$/.test(raw)) raw = raw.slice(0, -2);
+    var lead = raw.match(/^\d+/);
     return lead ? String(lead[0]) : "";
   }
 
@@ -78,6 +85,19 @@
 
   function injectIntoTable(table) {
     if (!table) return;
+    var headerRow = table.querySelector("thead tr");
+    if (headerRow && !headerRow.querySelector("." + ICON_HEADER_CLASS)) {
+      var th = document.createElement("th");
+      th.className = ICON_HEADER_CLASS;
+      th.textContent = "T+";
+      // Direkt vor ID (Index 1, da Index 0 die bestehende Befehlsspalte ist)
+      if (headerRow.children.length > 1) {
+        headerRow.insertBefore(th, headerRow.children[1]);
+      } else {
+        headerRow.appendChild(th);
+      }
+    }
+
     var rows = table.querySelectorAll("tbody tr");
     if (!rows || !rows.length) return;
 
@@ -89,14 +109,14 @@
       var number = extractCustomerNumber(row);
       if (!number) continue;
 
-      // Gewünschte Position: in die erste Befehls-Zelle vor die vorhandenen edit/brief Icons.
-      var commandCell = row.querySelector("td");
-      if (!commandCell) continue;
-      if (commandCell.querySelector("[data-tm-ticket-extras-btn='1']")) {
+      // Gewünschte Position: eigene Spalte direkt vor ID.
+      if (row.querySelector("." + ICON_ROW_CELL_CLASS + " [data-tm-ticket-extras-btn='1']")) {
         row.setAttribute(PROCESSED_ROW_ATTR, "1");
         continue;
       }
 
+      var cell = document.createElement("td");
+      cell.className = ICON_ROW_CELL_CLASS;
       var wrap = document.createElement("span");
       wrap.className = ICON_WRAP_CLASS;
       var btn = document.createElement("button");
@@ -111,7 +131,14 @@
         };
       })(number));
       wrap.appendChild(btn);
-      commandCell.insertBefore(wrap, commandCell.firstChild);
+      cell.appendChild(wrap);
+
+      // Vor ID einfügen (Index 1)
+      if (row.children.length > 1) {
+        row.insertBefore(cell, row.children[1]);
+      } else {
+        row.appendChild(cell);
+      }
       row.setAttribute(PROCESSED_ROW_ATTR, "1");
     }
   }
