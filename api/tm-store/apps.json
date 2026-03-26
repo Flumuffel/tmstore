@@ -1,0 +1,82 @@
+{
+  "updatedAt": "2026-03-26T18:05:08+01:00",
+  "source": {
+    "type": "github",
+    "repository": "https://github.com/Flumuffel/tmstore",
+    "ref": "main",
+    "generatedBy": "tools/tampermonkey/build_registry.py"
+  },
+  "apps": [
+    {
+      "id": "glz-tracker",
+      "name": "GLZ Tracker",
+      "author": "PHO",
+      "onDocumentLoad": true,
+      "description": "GLZ Live Tracker",
+      "version": "1.1.6",
+      "status": "published",
+      "approved": true,
+      "bundleUrl": "https://raw.githubusercontent.com/Flumuffel/tmstore/refs/heads/main/tools/tampermonkey/apps/glz-tracker/glz-tracker.app.js",
+      "cssUrl": "",
+      "match": "^https:\\/\\/intranet\\.klixa\\.ch\\/?(?:[?#].*)?$",
+      "sha256": "",
+      "changelog": [],
+      "settings": [
+        {
+          "key": "arbeitstage",
+          "type": "number",
+          "default": 5,
+          "min": 1,
+          "max": 5
+        }
+      ]
+    },
+    {
+      "id": "klixa-enhancements",
+      "name": "Klixa Enhancements",
+      "author": "PHO",
+      "onDocumentLoad": false,
+      "description": "Legacy Enhancements",
+      "version": "2.1.6",
+      "status": "published",
+      "approved": true,
+      "bundleUrl": "https://raw.githubusercontent.com/Flumuffel/tmstore/refs/heads/main/tools/tampermonkey/apps/klixa-enhancements/klixa-enhancements.app.js",
+      "cssUrl": "",
+      "match": "^https:\\/\\/intranet\\.klixa\\.ch\\/.*$",
+      "sha256": "",
+      "changelog": [
+        "Darkmode wird ohne Buttons automatisch aktiviert",
+        "Kürzeln in Online-Liste sortierbar",
+        "Schwarze Balken in Online-Liste rot",
+        "Gleitzeit-Gadget angepasst",
+        "Profil-Button neben Schnellbefehl (#fast_cmd)"
+      ],
+      "settings": [
+        {
+          "key": "kuerzel",
+          "type": "string",
+          "default": ""
+        }
+      ]
+    },
+    {
+      "id": "ticket-extras",
+      "name": "Ticket Extras",
+      "author": "LWE",
+      "onDocumentLoad": true,
+      "description": "Öffnet Kunden aus Ticketliste per Link-Icon",
+      "version": "1.0.4",
+      "status": "published",
+      "approved": true,
+      "bundleUrl": "https://raw.githubusercontent.com/Flumuffel/tmstore/refs/heads/main/tools/tampermonkey/apps/ticket-extras/ticket-extras.app.js",
+      "cssUrl": "",
+      "match": "^https:\\/\\/intranet\\.klixa\\.ch\\/.*$",
+      "sha256": "",
+      "changelog": [
+        "Fügt ein Kunden-Link-Icon vor Ticketzeilen hinzu"
+      ],
+      "settings": []
+    }
+  ],
+  "submissionQueue": []
+}
