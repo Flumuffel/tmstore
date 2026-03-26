@@ -2,13 +2,13 @@
 @id ticket-extras
 @name Ticket Extras
 @author LWE
-@version 1.0.3
-@description Öffnet Kunden aus Ticketliste per Icon
+@version 1.0.4
+@description Öffnet Kunden aus Ticketliste per Link-Icon
 @status published
 @approved true
 @match ^https:\/\/intranet\.klixa\.ch\/.*$
 @onDocumentLoad
-@changelog Fügt ein Kunden-Icon vor Ticketzeilen hinzu
+@changelog Fügt ein Kunden-Link-Icon vor Ticketzeilen hinzu
 ==/TMStoreApp== */
 
 (function () {
@@ -29,34 +29,9 @@
       "." + ICON_HEADER_CLASS + "{width:42px;min-width:42px;text-align:center}" +
       "." + ICON_ROW_CELL_CLASS + "{width:42px;min-width:42px;text-align:center}" +
       "." + ICON_WRAP_CLASS + "{display:flex;align-items:center;justify-content:center}" +
-      "." + ICON_BTN_CLASS + "{width:22px;height:22px;border-radius:6px;border:1px solid #7aa92f;background:#2b3138;color:#d8ff7a;cursor:pointer;font-weight:800;line-height:1}" +
+      "." + ICON_BTN_CLASS + "{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:6px;border:1px solid #7aa92f;background:#2b3138;color:#d8ff7a;cursor:pointer;font-weight:800;line-height:1;text-decoration:none}" +
       "." + ICON_BTN_CLASS + ":hover{filter:brightness(1.1)}";
     document.head.appendChild(style);
-  }
-
-  function sendFastCmd(command) {
-    var tries = 0;
-    var maxTries = 25;
-    var timer = window.setInterval(function () {
-      tries += 1;
-      var input = document.querySelector("#fast_cmd");
-      if (!input) {
-        if (tries >= maxTries) window.clearInterval(timer);
-        return;
-      }
-      input.focus();
-      input.value = command;
-      input.dispatchEvent(new Event("input", { bubbles: true }));
-      input.dispatchEvent(new Event("change", { bubbles: true }));
-      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true }));
-      input.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true }));
-      if (input.form && typeof input.form.requestSubmit === "function") {
-        input.form.requestSubmit();
-      } else if (input.form) {
-        input.form.submit();
-      }
-      window.clearInterval(timer);
-    }, 250);
   }
 
   function extractCustomerNumber(row) {
@@ -119,18 +94,13 @@
       cell.className = ICON_ROW_CELL_CLASS;
       var wrap = document.createElement("span");
       wrap.className = ICON_WRAP_CLASS;
-      var btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = ICON_BTN_CLASS;
-      btn.setAttribute("data-tm-ticket-extras-btn", "1");
-      btn.title = "Kunde öffnen (k" + number + ")";
-      btn.textContent = "@";
-      btn.addEventListener("click", (function (nr) {
-        return function () {
-          sendFastCmd("k" + nr);
-        };
-      })(number));
-      wrap.appendChild(btn);
+      var link = document.createElement("a");
+      link.className = ICON_BTN_CLASS;
+      link.setAttribute("data-tm-ticket-extras-btn", "1");
+      link.href = "/kv_kunden3.html?kunde=" + encodeURIComponent(number);
+      link.title = "Kunde öffnen (" + number + ") • Strg+Klick: neuer Tab";
+      link.textContent = "@";
+      wrap.appendChild(link);
       cell.appendChild(wrap);
 
       // Vor ID einfügen (Index 1)
